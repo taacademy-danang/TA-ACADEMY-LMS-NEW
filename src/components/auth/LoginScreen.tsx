@@ -87,7 +87,7 @@ export default function LoginScreen() {
               onClick={() => handleQuickLogin('admin', '123456')}
               className="p-2.5 rounded-xl border border-red-200 bg-red-50/60 hover:bg-red-100 text-left transition-colors"
             >
-              <div className="font-extrabold text-brand-500">👑 Admin</div>
+              <div className="font-extrabold text-brand-500">Admin</div>
               <div className="text-[10px] text-gray-500">Toàn quyền hệ thống</div>
             </button>
 

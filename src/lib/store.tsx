@@ -28,6 +28,7 @@ import {
   initialEvaluations,
   initialBenefits,
   initialLessonPlans,
+  initialSubmissions,
 } from './initialData';
 import { generateStudentCode, generateSessionsForClass } from './utils';
 
@@ -86,12 +87,15 @@ interface AppContextType {
 
   // Assignment workflow
   submitHomework: (assignmentId: string, studentId: string, studentName: string, link: string) => void;
+  saveHomeworkFeedback: (assignmentId: string, studentId: string, feedback: string) => void;
 
   // Benefits workflow
   updateBenefit: (id: string, data: { drive_link?: string; status?: 'completed' | 'in_progress' | 'overdue'; completed_date?: string }) => void;
 
   // Lesson Plans workflow
+  addLessonPlan: (plan: Omit<LessonPlan, 'id'>) => void;
   editLessonPlan: (id: string, data: Partial<LessonPlan>) => void;
+  deleteLessonPlan: (id: string) => void;
 
   // Account management
   toggleLockUser: (userId: string) => void;
@@ -124,7 +128,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [sessions, setSessions] = useState<ClassSession[]>(initialSessions);
   const [attendance, setAttendance] = useState<AttendanceRecord[]>(initialAttendance);
   const [assignments, setAssignments] = useState<Assignment[]>(initialAssignments);
-  const [submissions, setSubmissions] = useState<AssignmentSubmission[]>([]);
+  const [submissions, setSubmissions] = useState<AssignmentSubmission[]>(initialSubmissions);
   const [evaluations, setEvaluations] = useState<StudentEvaluation[]>(initialEvaluations);
   const [benefits, setBenefits] = useState<StudentBenefit[]>(initialBenefits);
   const [lessonPlans, setLessonPlans] = useState<LessonPlan[]>(initialLessonPlans);
@@ -525,6 +529,33 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     showToast('Đã nộp link bài tập thành công!');
   };
 
+  const saveHomeworkFeedback = (assignmentId: string, studentId: string, feedback: string) => {
+    setSubmissions((prev) => {
+      const existing = prev.find((s) => s.assignment_id === assignmentId && s.student_id === studentId);
+      if (existing) {
+        return prev.map((s) =>
+          s.id === existing.id
+            ? { ...s, teacher_feedback: feedback, status: 'reviewed', reviewed_at: new Date().toISOString() }
+            : s
+        );
+      }
+      const studentObj = students.find((st) => st.id === studentId);
+      const newSub: AssignmentSubmission = {
+        id: `sub-${Date.now()}`,
+        assignment_id: assignmentId,
+        student_id: studentId,
+        student_name: studentObj?.full_name || 'Học viên',
+        submission_link: '',
+        submission_date: new Date().toISOString(),
+        status: 'reviewed',
+        teacher_feedback: feedback,
+        reviewed_at: new Date().toISOString(),
+      };
+      return [newSub, ...prev];
+    });
+    showToast('Đã lưu nhận xét bài tập thành công!');
+  };
+
   const updateBenefit = (id: string, data: { drive_link?: string; status?: 'completed' | 'in_progress' | 'overdue'; completed_date?: string }) => {
     setBenefits((prev) =>
       prev.map((b) => (b.id === id ? { ...b, ...data } : b))
@@ -532,9 +563,23 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     showToast('Đã cập nhật quyền lợi & link Drive cho học viên!');
   };
 
+  const addLessonPlan = (planData: Omit<LessonPlan, 'id'>) => {
+    const newPlan: LessonPlan = {
+      ...planData,
+      id: `lp-${Date.now()}`,
+    };
+    setLessonPlans((prev) => [...prev, newPlan]);
+    showToast(`Đã thêm buổi học ${newPlan.session_number}: ${newPlan.title} vào giáo án!`);
+  };
+
   const editLessonPlan = (id: string, data: Partial<LessonPlan>) => {
     setLessonPlans((prev) => prev.map((lp) => (lp.id === id ? { ...lp, ...data } : lp)));
     showToast('Đã cập nhật nội dung giáo án và bài tập về nhà!');
+  };
+
+  const deleteLessonPlan = (id: string) => {
+    setLessonPlans((prev) => prev.filter((p) => p.id !== id));
+    showToast('Đã xóa buổi học khỏi giáo án!');
   };
 
   const toggleLockUser = (userId: string) => {
@@ -630,8 +675,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         saveAttendance,
         saveEvaluation,
         submitHomework,
+        saveHomeworkFeedback,
         updateBenefit,
+        addLessonPlan,
         editLessonPlan,
+        deleteLessonPlan,
         toggleLockUser,
         resetUserPassword,
         deleteUser,

@@ -10,6 +10,7 @@ import AttendancePortal from '@/components/attendance/AttendancePortal';
 import StudentEvaluationManager from '@/components/evaluations/StudentEvaluationManager';
 import AdminSettings from '@/components/settings/AdminSettings';
 import StudentPortal from '@/components/student/StudentPortal';
+import TeacherHomeworkManager from '@/components/assignments/TeacherHomeworkManager';
 import BenefitsManager from '@/components/benefits/BenefitsManager';
 import CurriculumManager from '@/components/curriculum/CurriculumManager';
 import LoginScreen from '@/components/auth/LoginScreen';
@@ -40,7 +41,7 @@ export default function AppMainPage() {
           {activeTab === 'intake' && <IntakePipeline />}
           {activeTab === 'schedule' && <ScheduleManager />}
           {activeTab === 'attendance' && <AttendancePortal />}
-          {activeTab === 'assignments' && <StudentPortal />}
+          {activeTab === 'assignments' && (currentUser.role === 'student' ? <StudentPortal /> : <TeacherHomeworkManager />)}
           {activeTab === 'evaluations' && <StudentEvaluationManager />}
           {activeTab === 'benefits' && <BenefitsManager />}
           {activeTab === 'curriculum' && <CurriculumManager />}

@@ -357,20 +357,12 @@ export default function IntakePipeline() {
                   </div>
 
                   <div className="flex items-center justify-between pt-1">
-                    <div className="flex items-center space-x-2">
-                      <button
-                        onClick={() => handleOpenAssignModal(item)}
-                        className="text-xs font-semibold text-gray-500 hover:text-gray-900 underline underline-offset-2"
-                      >
-                        Đổi mã lớp khác
-                      </button>
-                      <button
-                        onClick={() => handleOpenEdit(item)}
-                        className="text-xs font-semibold text-brand-500 hover:underline"
-                      >
-                        Sửa
-                      </button>
-                    </div>
+                    <button
+                      onClick={() => handleOpenAssignModal(item)}
+                      className="text-xs font-semibold text-gray-500 hover:text-gray-900 underline underline-offset-2"
+                    >
+                      Đổi mã lớp khác
+                    </button>
 
                     {item.status === 'account_created' ? (
                       <button

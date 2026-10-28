@@ -10,6 +10,7 @@ import {
   StudentEvaluation,
   StudentBenefit,
   LessonPlan,
+  AssignmentSubmission,
 } from '@/types';
 
 export const initialProfiles: Profile[] = [
@@ -500,5 +501,40 @@ export const initialBenefits: StudentBenefit[] = [
     completed_sessions: 12,
     total_registered_sessions: 12,
     absent_sessions: 0,
+  },
+];
+
+export const initialSubmissions: AssignmentSubmission[] = [
+  {
+    id: 'sub-01',
+    assignment_id: 'asg-01',
+    student_id: 'std-01',
+    student_name: 'Lê Hoàng Thu Thảo',
+    submission_link: 'https://drive.google.com/file/d/1a2b3c4d5e6f/view',
+    submission_date: '2026-10-26T18:45:00Z',
+    status: 'reviewed',
+    teacher_feedback: 'Con đứng rất thẳng và đẹp, cần giữ vai thả lỏng hơn một chút để tự nhiên.',
+    reviewed_at: '2026-10-27T09:00:00Z',
+  },
+  {
+    id: 'sub-02',
+    assignment_id: 'asg-01',
+    student_id: 'std-02',
+    student_name: 'Trần Ngọc Ánh',
+    submission_link: 'https://drive.google.com/file/d/2b3c4d5e6f7g/view',
+    submission_date: '2026-10-27T10:15:00Z',
+    status: 'submitted',
+    teacher_feedback: '',
+  },
+  {
+    id: 'sub-03',
+    assignment_id: 'asg-01',
+    student_id: 'std-03',
+    student_name: 'Võ Minh Khôi',
+    submission_link: 'https://drive.google.com/file/d/3c4d5e6f7g8h/view',
+    submission_date: '2026-10-27T14:20:00Z',
+    status: 'reviewed',
+    teacher_feedback: 'Tư thế đứng thẳng tốt, cần chú ý góc mặt hướng thẳng ống kính.',
+    reviewed_at: '2026-10-27T16:00:00Z',
   },
 ];
