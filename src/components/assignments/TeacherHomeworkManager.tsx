@@ -102,7 +102,12 @@ export default function TeacherHomeworkManager() {
   const studentRows = useMemo(() => {
     return classStudents.map((st) => {
       const sub = submissions.find(
-        (s) => s.assignment_id === activeAssignment.id && (s.student_id === st.id || s.student_name === st.full_name)
+        (s) =>
+          (s.assignment_id === activeAssignment.id ||
+            s.assignment_id.endsWith(`-${selectedSessionNumber}`) ||
+            s.assignment_id === 'asg-01' ||
+            s.assignment_id === 'asg-1') &&
+          (s.student_id === st.id || s.student_name === st.full_name)
       );
 
       const isSubmitted = !!sub && !!sub.submission_link;

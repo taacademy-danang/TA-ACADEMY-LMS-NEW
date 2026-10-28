@@ -40,7 +40,9 @@ export default function StudentPortal() {
 
   // Kiểm tra bài nộp của học viên này
   const activeSubmission = submissions.find(
-    (s) => s.assignment_id === activeAssignment.id && (s.student_id === student?.id || s.student_name === student?.full_name)
+    (s) =>
+      (s.assignment_id === activeAssignment.id || s.assignment_id.endsWith(`-${activeAssignment.session_number}`)) &&
+      (s.student_id === student?.id || s.student_name === student?.full_name)
   );
 
   const teacherEvaluation = evaluations.find(
@@ -204,15 +206,15 @@ export default function StudentPortal() {
           </button>
         </div>
 
-        {/* Nhận xét từ cô giáo nếu đã được nhận xét */}
-        {activeSubmission?.teacher_feedback && (
+        {/* Nhận xét từ cô giáo nếu đã được nhận xét (từ đánh giá hoặc từ bài nộp) */}
+        {(activeSubmission?.teacher_feedback || teacherEvaluation?.content) && (
           <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 space-y-2">
             <div className="flex items-center space-x-2 text-emerald-800 font-bold text-xs">
               <MessageSquare className="w-4 h-4 text-emerald-600" />
-              <span>Nhận xét của giáo viên phụ trách:</span>
+              <span>Nhận xét của giáo viên phụ trách ({teacherEvaluation?.created_by || 'Giáo viên'}):</span>
             </div>
             <p className="text-xs text-emerald-950 leading-relaxed font-semibold pl-6">
-              &ldquo;{activeSubmission.teacher_feedback}&rdquo;
+              &ldquo;{activeSubmission?.teacher_feedback || teacherEvaluation?.content}&rdquo;
             </p>
           </div>
         )}

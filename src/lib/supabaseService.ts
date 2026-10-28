@@ -206,15 +206,58 @@ export async function dbBatchImportLessonPlans(courseId: string, plans: LessonPl
 // ==========================================
 export async function dbSaveEvaluation(evaluation: StudentEvaluation) {
   if (!isSupabaseConfigured || !supabase) return;
-  await supabase.from('student_evaluations').insert(evaluation);
+  const payload = {
+    ...evaluation,
+    class_id: evaluation.class_id && evaluation.class_id.trim() !== '' ? evaluation.class_id : null,
+    student_id: evaluation.student_id && evaluation.student_id.trim() !== '' ? evaluation.student_id : null,
+    session_id: evaluation.session_id && evaluation.session_id.trim() !== '' ? evaluation.session_id : null,
+  };
+  const { error } = await supabase.from('student_evaluations').upsert(payload, { onConflict: 'id' });
+  if (error) console.error('Error dbSaveEvaluation:', error);
 }
 
 // ==========================================
 // THAO TÁC BÀI TẬP & BÀI NỘP (SUBMISSIONS)
 // ==========================================
+export async function dbAddAssignment(assignment: Assignment) {
+  if (!isSupabaseConfigured || !supabase) return;
+  const payload = {
+    ...assignment,
+    class_id: assignment.class_id && assignment.class_id.trim() !== '' ? assignment.class_id : null,
+    session_id: assignment.session_id && assignment.session_id.trim() !== '' ? assignment.session_id : null,
+  };
+  await supabase.from('assignments').upsert(payload, { onConflict: 'id' });
+}
+
 export async function dbSubmitHomework(submission: AssignmentSubmission) {
   if (!isSupabaseConfigured || !supabase) return;
-  await supabase.from('assignment_submissions').upsert(submission, { onConflict: 'id' });
+  // Đảm bảo assignment tồn tại trên Supabase trước để không bị lỗi foreign key
+  const { data: existingAsg } = await supabase
+    .from('assignments')
+    .select('id')
+    .eq('id', submission.assignment_id)
+    .limit(1);
+
+  if (!existingAsg || existingAsg.length === 0) {
+    await supabase.from('assignments').insert([
+      {
+        id: submission.assignment_id,
+        title: 'Bài tập thực hành buổi học',
+        description: 'Nộp link bài làm qua Google Drive',
+        session_number: 1,
+        class_id: null,
+        due_date: new Date().toISOString().split('T')[0],
+        requirements: ['Quay video thực hành theo giáo án', 'Tải lên Google Drive và mở quyền truy cập'],
+      },
+    ]);
+  }
+
+  const payload = {
+    ...submission,
+    student_id: submission.student_id && submission.student_id.trim() !== '' ? submission.student_id : null,
+  };
+  const { error } = await supabase.from('assignment_submissions').upsert(payload, { onConflict: 'id' });
+  if (error) console.error('Error dbSubmitHomework:', error);
 }
 
 export async function dbSaveHomeworkFeedback(submissionId: string, feedback: string) {
@@ -234,7 +277,11 @@ export async function dbSaveHomeworkFeedback(submissionId: string, feedback: str
 // ==========================================
 export async function dbAddBenefit(benefit: StudentBenefit) {
   if (!isSupabaseConfigured || !supabase) return;
-  await supabase.from('student_benefits').insert(benefit);
+  const payload = {
+    ...benefit,
+    student_id: benefit.student_id && benefit.student_id.trim() !== '' ? benefit.student_id : null,
+  };
+  await supabase.from('student_benefits').upsert(payload, { onConflict: 'id' });
 }
 
 export async function dbUpdateBenefit(id: string, data: Partial<StudentBenefit>) {

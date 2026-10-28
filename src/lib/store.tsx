@@ -208,11 +208,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       });
     }
 
-    // Khôi phục phiên đăng nhập nếu đã đăng nhập trước đó trên trình duyệt này
+    // Xóa sạch phiên cũ lưu tự động từ trước trên tất cả thiết bị
     if (typeof window !== 'undefined') {
-      const savedUserId = sessionStorage.getItem('ta_current_user_id') || localStorage.getItem('ta_current_user_id');
-      if (savedUserId) {
-        const found = profiles.find((p) => p.id === savedUserId);
+      localStorage.removeItem('ta_current_user_id'); // Xóa key cũ tự lưu trước đây
+
+      // Chỉ khôi phục phiên nếu người dùng đã chủ động tick "Lưu phiên đăng nhập"
+      const rememberedUserId = localStorage.getItem('ta_auth_remembered_user');
+      const sessionUserId = sessionStorage.getItem('ta_auth_session_user');
+      const activeId = rememberedUserId || sessionUserId;
+      if (activeId) {
+        const found = profiles.find((p) => p.id === activeId);
         if (found) {
           setCurrentUser(found);
           setIsAuthenticated(true);
@@ -246,10 +251,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setIsAuthenticated(true);
         if (typeof window !== 'undefined') {
           if (rememberMe) {
-            localStorage.setItem('ta_current_user_id', found.id);
+            localStorage.setItem('ta_auth_remembered_user', found.id);
           } else {
-            sessionStorage.setItem('ta_current_user_id', found.id);
-            localStorage.removeItem('ta_current_user_id');
+            sessionStorage.setItem('ta_auth_session_user', found.id);
+            localStorage.removeItem('ta_auth_remembered_user');
           }
         }
         showToast(`Đăng nhập thành công! Chào mừng ${found.full_name} (${found.role.toUpperCase()})`);
@@ -263,10 +268,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setIsAuthenticated(true);
       if (typeof window !== 'undefined') {
         if (rememberMe) {
-          localStorage.setItem('ta_current_user_id', initialProfiles[0].id);
+          localStorage.setItem('ta_auth_remembered_user', initialProfiles[0].id);
         } else {
-          sessionStorage.setItem('ta_current_user_id', initialProfiles[0].id);
-          localStorage.removeItem('ta_current_user_id');
+          sessionStorage.setItem('ta_auth_session_user', initialProfiles[0].id);
+          localStorage.removeItem('ta_auth_remembered_user');
         }
       }
       showToast('Đăng nhập thành công tài khoản Quản Trị Viên (Admin)');
@@ -280,7 +285,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const logout = () => {
     setIsAuthenticated(false);
     if (typeof window !== 'undefined') {
+      localStorage.removeItem('ta_auth_remembered_user');
       localStorage.removeItem('ta_current_user_id');
+      sessionStorage.removeItem('ta_auth_session_user');
       sessionStorage.removeItem('ta_current_user_id');
     }
     showToast('Đã đăng xuất khỏi hệ thống', 'info');
@@ -629,29 +636,33 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const saveEvaluation = (data: Omit<StudentEvaluation, 'id' | 'created_at' | 'updated_at'>) => {
     const existingIndex = evaluations.findIndex(
-      (e) => e.student_id === data.student_id && e.session_date === data.session_date
+      (e) =>
+        (e.student_id === data.student_id || e.student_name === data.student_name) &&
+        e.session_date === data.session_date
     );
 
+    let savedEval: StudentEvaluation;
     if (existingIndex >= 0) {
+      savedEval = {
+        ...evaluations[existingIndex],
+        ...data,
+        updated_at: new Date().toISOString(),
+      };
       setEvaluations((prev) =>
-        prev.map((item, idx) =>
-          idx === existingIndex
-            ? { ...item, content: data.content, updated_at: new Date().toISOString() }
-            : item
-        )
+        prev.map((item, idx) => (idx === existingIndex ? savedEval : item))
       );
       showToast('Đã cập nhật đánh giá buổi học thành công!');
     } else {
-      const newEval: StudentEvaluation = {
+      savedEval = {
         ...data,
         id: `eval-${Date.now()}`,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
-      setEvaluations((prev) => [newEval, ...prev]);
-      dbSaveEvaluation(newEval);
+      setEvaluations((prev) => [savedEval, ...prev]);
       showToast('Đã lưu nhận xét đánh giá học viên thành công!');
     }
+    dbSaveEvaluation(savedEval);
   };
 
   const submitHomework = (assignmentId: string, studentId: string, studentName: string, link: string) => {
@@ -664,7 +675,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       submission_date: new Date().toISOString(),
       status: 'submitted',
     };
-    setSubmissions((prev) => [newSub, ...prev.filter((s) => s.assignment_id !== assignmentId || s.student_id !== studentId)]);
+    setSubmissions((prev) => [
+      newSub,
+      ...prev.filter(
+        (s) =>
+          !(
+            (s.assignment_id === assignmentId || s.assignment_id.endsWith(`-${assignmentId.split('-').pop()}`)) &&
+            (s.student_id === studentId || s.student_name === studentName)
+          )
+      ),
+    ]);
     dbSubmitHomework(newSub);
     showToast('Đã nộp link bài tập thành công!');
   };
@@ -672,7 +692,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const saveHomeworkFeedback = (assignmentId: string, studentId: string, feedback: string) => {
     let subId = '';
     setSubmissions((prev) => {
-      const existing = prev.find((s) => s.assignment_id === assignmentId && s.student_id === studentId);
+      const existing = prev.find(
+        (s) =>
+          (s.assignment_id === assignmentId || s.assignment_id.endsWith(`-${assignmentId.split('-').pop()}`)) &&
+          (s.student_id === studentId || s.student_name === studentId)
+      );
       if (existing) {
         subId = existing.id;
         return prev.map((s) =>
@@ -681,7 +705,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             : s
         );
       }
-      const studentObj = students.find((st) => st.id === studentId);
+      const studentObj = students.find((st) => st.id === studentId || st.full_name === studentId);
       const newSub: AssignmentSubmission = {
         id: `sub-${Date.now()}`,
         assignment_id: assignmentId,
@@ -702,11 +726,51 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     showToast('Đã lưu nhận xét bài tập thành công!');
   };
 
-  const updateBenefit = (id: string, data: { drive_link?: string; status?: 'completed' | 'in_progress' | 'overdue'; completed_date?: string }) => {
-    setBenefits((prev) =>
-      prev.map((b) => (b.id === id ? { ...b, ...data } : b))
-    );
-    dbUpdateBenefit(id, data);
+  const updateBenefit = (
+    id: string,
+    data: {
+      drive_link?: string;
+      status?: 'completed' | 'in_progress' | 'overdue';
+      completed_date?: string;
+    }
+  ) => {
+    let updatedBen: StudentBenefit | null = null;
+    setBenefits((prev) => {
+      const exists = prev.some((b) => b.id === id);
+      if (exists) {
+        return prev.map((b) => {
+          if (b.id === id) {
+            updatedBen = { ...b, ...data };
+            return updatedBen;
+          }
+          return b;
+        });
+      } else {
+        const student = students.find((s) => `ben-${s.id}` === id || s.id === id);
+        const newB: StudentBenefit = {
+          id: id,
+          student_id: student?.id || id,
+          student_name: student?.full_name || 'Học viên',
+          student_code: student?.student_code || 'HV',
+          course_name: student?.course_name || 'Model Kids',
+          class_code: student?.class_code || 'K99',
+          drive_link: data.drive_link || '',
+          status: data.status || 'in_progress',
+          completed_date: data.completed_date,
+          completed_sessions: student?.completed_sessions || 0,
+          total_registered_sessions: student?.total_registered_sessions || 16,
+          absent_sessions: student?.absent_sessions || 0,
+        };
+        updatedBen = newB;
+        return [newB, ...prev];
+      }
+    });
+
+    if (updatedBen) {
+      dbAddBenefit(updatedBen);
+    } else {
+      dbUpdateBenefit(id, data);
+    }
     showToast('Đã cập nhật quyền lợi & link Drive cho học viên!');
   };
 

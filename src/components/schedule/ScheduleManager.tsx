@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Calendar as CalendarIcon,
   ChevronLeft,
@@ -69,15 +69,33 @@ export default function ScheduleManager() {
 
   const [weekOffset, setWeekOffset] = useState(0);
 
-  const daysOfWeekHeader = [
-    { name: 'Thứ 2', date: '26/10', dayIndex: 1, fullDate: '2026-10-26' },
-    { name: 'Thứ 3', date: '27/10', dayIndex: 2, fullDate: '2026-10-27', isToday: true },
-    { name: 'Thứ 4', date: '28/10', dayIndex: 3, fullDate: '2026-10-28', isToday: true },
-    { name: 'Thứ 5', date: '29/10', dayIndex: 4, fullDate: '2026-10-29' },
-    { name: 'Thứ 6', date: '30/10', dayIndex: 5, fullDate: '2026-10-30' },
-    { name: 'Thứ 7', date: '31/10', dayIndex: 6, fullDate: '2026-10-31' },
-    { name: 'Chủ nhật', date: '01/11', dayIndex: 7, fullDate: '2026-11-01' },
-  ];
+  // Tính toán động 7 ngày trong tuần dựa vào weekOffset
+  const daysOfWeekHeader = useMemo(() => {
+    const today = new Date();
+    const currentDay = today.getDay();
+    const distanceToMonday = currentDay === 0 ? -6 : 1 - currentDay;
+    const monday = new Date(today);
+    monday.setDate(today.getDate() + distanceToMonday + weekOffset * 7);
+
+    const DAY_NAMES = ['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'Chủ nhật'];
+    return Array.from({ length: 7 }).map((_, i) => {
+      const d = new Date(monday);
+      d.setDate(monday.getDate() + i);
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      const fullDate = `${yyyy}-${mm}-${dd}`;
+      const isToday = fullDate === today.toISOString().split('T')[0];
+
+      return {
+        name: DAY_NAMES[i],
+        date: `${dd}/${mm}`,
+        dayIndex: i + 1,
+        fullDate,
+        isToday,
+      };
+    });
+  }, [weekOffset]);
 
   const timeSlots = [
     '08:00',
@@ -362,10 +380,37 @@ export default function ScheduleManager() {
                           return s.day_of_week === d.dayIndex && sHour === hour;
                         });
 
-                        // Lọc duy nhất, mỗi lớp chỉ xuất hiện đúng 1 ô trên 1 khung giờ
+                        // Bổ sung lịch học tự động từ các lớp đã tạo (classes) nếu lớp đó học vào thứ này
+                        const classFallbackSessions = classes
+                          .filter((c) => {
+                            const cHour = parseInt(c.start_time.split(':')[0], 10);
+                            const matchesClass = selectedClass === 'all' || c.id === selectedClass || c.code === selectedClass;
+                            const matchesTeacher = selectedTeacher === 'all' || c.teacher_id === selectedTeacher || c.teacher_name === selectedTeacher;
+                            const matchesDay = c.days_of_week?.includes(d.dayIndex);
+                            return matchesClass && matchesTeacher && matchesDay && cHour === hour;
+                          })
+                          .map((c) => ({
+                            id: `cls-sess-${c.id}-${d.dayIndex}`,
+                            class_id: c.id,
+                            class_code: c.code,
+                            class_name: c.name,
+                            course_name: c.course_name,
+                            session_type: c.class_type === 'one_on_one' ? ('private' as const) : ('group' as const),
+                            session_number: 1,
+                            session_date: d.fullDate,
+                            day_of_week: d.dayIndex,
+                            start_time: c.start_time,
+                            end_time: c.end_time,
+                            teacher_id: c.teacher_id,
+                            teacher_name: c.teacher_name,
+                            room: c.room,
+                            status: 'scheduled' as const,
+                          }));
+
+                        // Gộp và lọc duy nhất, mỗi lớp chỉ xuất hiện đúng 1 ô trên 1 khung giờ
                         const uniqueSessions = Array.from(
                           new Map(
-                            matchedSessions.map((item) => [
+                            [...matchedSessions, ...classFallbackSessions].map((item) => [
                               `${item.class_id || item.class_code || item.class_name}-${item.start_time}`,
                               item,
                             ])

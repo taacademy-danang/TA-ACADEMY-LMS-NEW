@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Gift,
   Award,
@@ -35,19 +35,55 @@ export default function BenefitsManager() {
   );
   const teacherClassCodes = teacherClasses.map((c) => c.code);
 
-  const visibleBenefits = benefits.filter((b) => {
-    if (isStudent) {
-      return (
-        b.student_name === currentUser.full_name ||
-        b.student_code === currentUser.student_code ||
-        b.student_name.includes(currentUser.full_name)
-      );
-    }
-    if (isTeacher) {
-      return teacherClassCodes.includes(b.class_code);
-    }
-    return true;
-  });
+  // Tổng hợp danh sách quyền lợi từ bảng benefits VÀ danh sách học viên hiện có
+  const allStudentBenefits = useMemo(() => {
+    // Lấy tất cả hồ sơ benefits đã lưu
+    const map = new Map<string, StudentBenefit>();
+    benefits.forEach((b) => {
+      const key = b.student_code || b.student_name || b.id;
+      map.set(key, b);
+    });
+
+    // Bổ sung các học viên từ danh sách students nếu chưa có trong benefits
+    students.forEach((s) => {
+      const key = s.student_code || s.full_name || s.id;
+      if (!map.has(key)) {
+        const isMilestone = (s.course_name || '').includes('Model Kids') || (s.course_name || '').includes('Catwalk');
+        map.set(key, {
+          id: `ben-${s.id}`,
+          student_id: s.id,
+          student_name: s.full_name,
+          student_code: s.student_code,
+          course_name: s.course_name || 'Model Kids',
+          class_code: s.class_code || 'K99',
+          drive_link: '',
+          status: 'in_progress' as const,
+          is_milestone_17: isMilestone,
+          completed_sessions: s.completed_sessions || 0,
+          total_registered_sessions: s.total_registered_sessions || 16,
+          absent_sessions: s.absent_sessions || 0,
+        });
+      }
+    });
+
+    return Array.from(map.values());
+  }, [students, benefits]);
+
+  const visibleBenefits = useMemo(() => {
+    return allStudentBenefits.filter((b) => {
+      if (isStudent) {
+        return (
+          b.student_name === currentUser.full_name ||
+          b.student_code === currentUser.student_code ||
+          b.student_name.includes(currentUser.full_name)
+        );
+      }
+      if (isTeacher) {
+        return teacherClassCodes.includes(b.class_code);
+      }
+      return true;
+    });
+  }, [allStudentBenefits, isStudent, isTeacher, currentUser, teacherClassCodes]);
 
   const [editingBenefit, setEditingBenefit] = useState<StudentBenefit | null>(null);
   const [driveLinkInput, setDriveLinkInput] = useState('');
