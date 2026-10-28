@@ -6,11 +6,12 @@
 -- 1. Bật Extension UUID
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- 2. BẢNG PROFILES (Người dùng hệ thống: Admin, Teacher, Student)
+-- 2. BẢNG PROFILES / USERS (Người dùng hệ thống: Admin, Teacher, Student & Thông tin đăng nhập)
 CREATE TABLE IF NOT EXISTS public.profiles (
     id TEXT PRIMARY KEY,
     email VARCHAR(255) UNIQUE NOT NULL,
     username VARCHAR(100) UNIQUE,
+    password VARCHAR(255) DEFAULT '123456',
     full_name VARCHAR(255) NOT NULL,
     role VARCHAR(50) NOT NULL CHECK (role IN ('admin', 'teacher', 'student')),
     phone VARCHAR(50) NOT NULL,
@@ -20,6 +21,9 @@ CREATE TABLE IF NOT EXISTS public.profiles (
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- VIEW USERS đồng bộ với PROFILES
+CREATE OR REPLACE VIEW public.users AS SELECT * FROM public.profiles;
 
 -- 3. BẢNG COURSES (Khóa học mặc định: Phong thái, Catwalk, Model Kids...)
 CREATE TABLE IF NOT EXISTS public.courses (
