@@ -157,7 +157,7 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [currentUser, setCurrentUser] = useState<Profile>(initialProfiles[0]); // Ban Giám Đốc T.A
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(true); // Có thể logout ra màn hình đăng nhập
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false); // Bắt buộc đăng nhập trước khi vào trang chủ
 
   const [profiles, setProfiles] = useState<Profile[]>(initialProfiles);
   const [courses, setCourses] = useState<Course[]>(initialCourses);
@@ -207,6 +207,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         }
       });
     }
+
+    // Khôi phục phiên đăng nhập nếu đã đăng nhập trước đó trên trình duyệt này
+    if (typeof window !== 'undefined') {
+      const savedUserId = localStorage.getItem('ta_current_user_id');
+      if (savedUserId) {
+        const found = profiles.find((p) => p.id === savedUserId);
+        if (found) {
+          setCurrentUser(found);
+          setIsAuthenticated(true);
+        }
+      }
+    }
   }, []);
 
   // Auth: Đăng nhập
@@ -222,6 +234,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (found && (passInput === '123456' || passInput === 'admin')) {
       setCurrentUser(found);
       setIsAuthenticated(true);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('ta_current_user_id', found.id);
+      }
       showToast(`Đăng nhập thành công! Chào mừng ${found.full_name} (${found.role.toUpperCase()})`);
       return true;
     }
@@ -230,6 +245,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (u === 'admin' && (passInput === '123456' || passInput === 'admin')) {
       setCurrentUser(initialProfiles[0]);
       setIsAuthenticated(true);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('ta_current_user_id', initialProfiles[0].id);
+      }
       showToast('Đăng nhập thành công tài khoản Quản Trị Viên (Admin)');
       return true;
     }
@@ -240,6 +258,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const logout = () => {
     setIsAuthenticated(false);
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('ta_current_user_id');
+    }
     showToast('Đã đăng xuất khỏi hệ thống', 'info');
   };
 
