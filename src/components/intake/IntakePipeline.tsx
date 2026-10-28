@@ -14,7 +14,8 @@ import {
   Copy,
   Check,
   X,
-  ExternalLink,
+  Edit2,
+  Trash2,
 } from 'lucide-react';
 import { useApp } from '@/lib/store';
 import { IntakeRecord } from '@/types';
@@ -26,12 +27,14 @@ export default function IntakePipeline() {
     courses,
     classes,
     addIntakeRecord,
+    editIntakeRecord,
     assignClassToIntake,
     generateAccountForIntake,
   } = useApp();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [selectedIntake, setSelectedIntake] = useState<IntakeRecord | null>(null);
   const [selectedClassId, setSelectedClassId] = useState('');
@@ -55,11 +58,20 @@ export default function IntakePipeline() {
 
   const [copied, setCopied] = useState(false);
 
-  // Form state
+  // Form state tạo mới
   const [newForm, setNewForm] = useState({
     full_name: '',
     phone: '',
     course_id: courses[0]?.id || '',
+    total_sessions: courses[0]?.total_sessions || 16,
+  });
+
+  // Form state chỉnh sửa
+  const [editForm, setEditForm] = useState({
+    id: '',
+    full_name: '',
+    phone: '',
+    course_id: '',
     total_sessions: 16,
   });
 
@@ -86,9 +98,32 @@ export default function IntakePipeline() {
       full_name: '',
       phone: '',
       course_id: courses[0]?.id || '',
-      total_sessions: 16,
+      total_sessions: courses[0]?.total_sessions || 16,
     });
     setShowAddModal(false);
+  };
+
+  const handleOpenEdit = (item: IntakeRecord) => {
+    setEditForm({
+      id: item.id,
+      full_name: item.full_name,
+      phone: item.phone,
+      course_id: item.course_id,
+      total_sessions: item.total_sessions,
+    });
+    setShowEditModal(true);
+  };
+
+  const handleEditSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editForm.full_name || !editForm.phone) return;
+    editIntakeRecord(editForm.id, {
+      full_name: editForm.full_name,
+      phone: editForm.phone,
+      course_id: editForm.course_id,
+      total_sessions: editForm.total_sessions,
+    });
+    setShowEditModal(false);
   };
 
   const handleOpenAssignModal = (intake: IntakeRecord) => {
@@ -141,7 +176,15 @@ export default function IntakePipeline() {
         </div>
 
         <button
-          onClick={() => setShowAddModal(true)}
+          onClick={() => {
+            setNewForm({
+              full_name: '',
+              phone: '',
+              course_id: courses[0]?.id || '',
+              total_sessions: courses[0]?.total_sessions || 16,
+            });
+            setShowAddModal(true);
+          }}
           className="inline-flex items-center justify-center space-x-2 px-5 py-2.5 bg-brand-500 hover:bg-brand-600 text-white font-semibold rounded-xl text-sm shadow-md shadow-red-200 transition-all hover:scale-[1.02]"
         >
           <UserPlus className="w-4 h-4" />
@@ -191,7 +234,7 @@ export default function IntakePipeline() {
             </span>
           </div>
           <p className="text-xs text-gray-500 mt-2.5 mb-4">
-            Học viên mới đăng ký chưa có lịch học. Bạn có thể chọn xếp lớp hoặc cấp tài khoản ngay.
+            Học viên mới đăng ký chưa có lịch học. Bạn có thể chọn xếp lớp hoặc chỉnh sửa thông tin.
           </p>
 
           <div className="space-y-3 flex-1 overflow-y-auto">
@@ -226,7 +269,16 @@ export default function IntakePipeline() {
                     </div>
                   </div>
 
-                  <div className="mt-3.5 flex justify-end">
+                  <div className="mt-3.5 flex items-center justify-between">
+                    {/* Nút chỉnh sửa theo yêu cầu */}
+                    <button
+                      onClick={() => handleOpenEdit(item)}
+                      className="inline-flex items-center space-x-1 text-xs font-semibold text-gray-600 hover:text-brand-500 p-1 rounded"
+                    >
+                      <Edit2 className="w-3.5 h-3.5" />
+                      <span>Sửa thông tin</span>
+                    </button>
+
                     <button
                       onClick={() => handleOpenAssignModal(item)}
                       className="px-3.5 py-1.5 bg-brand-500 hover:bg-brand-600 text-white text-xs font-semibold rounded-lg shadow-sm transition-colors"
@@ -306,12 +358,20 @@ export default function IntakePipeline() {
                   </div>
 
                   <div className="flex items-center justify-between pt-1">
-                    <button
-                      onClick={() => handleOpenAssignModal(item)}
-                      className="text-xs font-semibold text-gray-500 hover:text-gray-900 underline underline-offset-2"
-                    >
-                      Đổi mã lớp khác
-                    </button>
+                    <div className="flex items-center space-x-2">
+                      <button
+                        onClick={() => handleOpenAssignModal(item)}
+                        className="text-xs font-semibold text-gray-500 hover:text-gray-900 underline underline-offset-2"
+                      >
+                        Đổi mã lớp khác
+                      </button>
+                      <button
+                        onClick={() => handleOpenEdit(item)}
+                        className="text-xs font-semibold text-brand-500 hover:underline"
+                      >
+                        Sửa
+                      </button>
+                    </div>
 
                     {item.status === 'account_created' ? (
                       <button
@@ -361,7 +421,6 @@ export default function IntakePipeline() {
           </div>
 
           <div className="space-y-4 mt-4 flex-1">
-            {/* Box quy tắc đồng bộ */}
             <div className="p-4 bg-white rounded-xl border border-emerald-200/80 shadow-sm space-y-3">
               <div className="flex items-center space-x-2 text-emerald-700 font-bold text-xs">
                 <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
@@ -377,7 +436,6 @@ export default function IntakePipeline() {
               </ul>
             </div>
 
-            {/* Box Zalo / SMS */}
             <div className="p-4 bg-emerald-100/50 rounded-xl border border-emerald-200 text-center space-y-2">
               <div className="w-8 h-8 rounded-full bg-emerald-500 text-white flex items-center justify-center mx-auto shadow-sm">
                 <Sparkles className="w-4 h-4" />
@@ -391,9 +449,9 @@ export default function IntakePipeline() {
         </div>
       </div>
 
-      {/* Modal: Tiếp nhận học viên mới */}
+      {/* Modal: Tiếp nhận học viên mới (Lấy dữ liệu động từ khóa học đã cài) */}
       {showAddModal && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn">
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-gray-100">
             <div className="flex items-center justify-between pb-4 border-b border-gray-100">
               <h3 className="font-extrabold text-gray-900 text-base">Tiếp nhận học viên mới</h3>
@@ -435,15 +493,25 @@ export default function IntakePipeline() {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">Khóa học đăng ký</label>
+                <label className="block text-xs font-bold text-gray-700 mb-1">
+                  Khóa học đăng ký (Lấy từ Khóa học đã cài) <span className="text-red-500">*</span>
+                </label>
                 <select
                   value={newForm.course_id}
-                  onChange={(e) => setNewForm({ ...newForm, course_id: e.target.value })}
+                  onChange={(e) => {
+                    const cId = e.target.value;
+                    const found = courses.find((c) => c.id === cId);
+                    setNewForm({
+                      ...newForm,
+                      course_id: cId,
+                      total_sessions: found ? found.total_sessions : 16,
+                    });
+                  }}
                   className="w-full px-3.5 py-2 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
                 >
                   {courses.map((c) => (
                     <option key={c.id} value={c.id}>
-                      {c.name} ({c.total_sessions} buổi)
+                      {c.name} ({c.total_sessions} buổi - Mã: {c.code})
                     </option>
                   ))}
                 </select>
@@ -475,6 +543,103 @@ export default function IntakePipeline() {
                   className="px-5 py-2 text-xs font-bold text-white bg-brand-500 hover:bg-brand-600 rounded-xl shadow-md shadow-red-200 transition-colors"
                 >
                   Lưu vào danh sách chờ xếp lớp
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Chỉnh sửa thông tin học viên */}
+      {showEditModal && (
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-gray-100">
+            <div className="flex items-center justify-between pb-4 border-b border-gray-100">
+              <h3 className="font-extrabold text-gray-900 text-base">Chỉnh sửa thông tin học viên</h3>
+              <button
+                onClick={() => setShowEditModal(false)}
+                className="text-gray-400 hover:text-gray-600 p-1 rounded-lg"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleEditSubmit} className="mt-4 space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">
+                  Họ và tên học viên <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editForm.full_name}
+                  onChange={(e) => setEditForm({ ...editForm, full_name: e.target.value })}
+                  className="w-full px-3.5 py-2 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">
+                  Số điện thoại <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="tel"
+                  required
+                  value={editForm.phone}
+                  onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                  className="w-full px-3.5 py-2 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">Khóa học đăng ký</label>
+                <select
+                  value={editForm.course_id}
+                  onChange={(e) => {
+                    const cId = e.target.value;
+                    const found = courses.find((c) => c.id === cId);
+                    setEditForm({
+                      ...editForm,
+                      course_id: cId,
+                      total_sessions: found ? found.total_sessions : editForm.total_sessions,
+                    });
+                  }}
+                  className="w-full px-3.5 py-2 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+                >
+                  {courses.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name} ({c.total_sessions} buổi)
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">Tổng số buổi đăng ký</label>
+                <input
+                  type="number"
+                  min="1"
+                  value={editForm.total_sessions}
+                  onChange={(e) =>
+                    setEditForm({ ...editForm, total_sessions: parseInt(e.target.value, 10) || 16 })
+                  }
+                  className="w-full px-3.5 py-2 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+                />
+              </div>
+
+              <div className="pt-3 flex items-center justify-end space-x-3 border-t border-gray-100">
+                <button
+                  type="button"
+                  onClick={() => setShowEditModal(false)}
+                  className="px-4 py-2 text-xs font-bold text-gray-600 hover:bg-gray-100 rounded-xl transition-colors"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 text-xs font-bold text-white bg-brand-500 hover:bg-brand-600 rounded-xl shadow-md shadow-red-200 transition-colors"
+                >
+                  Cập nhật thông tin
                 </button>
               </div>
             </form>

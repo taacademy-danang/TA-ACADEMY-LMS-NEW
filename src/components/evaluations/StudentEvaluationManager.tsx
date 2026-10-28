@@ -10,39 +10,56 @@ import {
   List,
   ListOrdered,
   RotateCcw,
-  RotateCw,
   BookOpen,
   Award,
   CheckCircle,
   FileText,
+  Filter,
 } from 'lucide-react';
 import { useApp } from '@/lib/store';
 import { Student } from '@/types';
 
 export default function StudentEvaluationManager() {
-  const { students, evaluations, saveEvaluation, currentUser, showToast } = useApp();
+  const { students, evaluations, sessions, saveEvaluation, currentUser, showToast } = useApp();
 
-  const [selectedStudentId, setSelectedStudentId] = useState<string>(students[0]?.id || 'std-01');
+  // Bộ lọc theo ngày để chỉ hiển thị học viên học buổi đó trong ngày đã chọn
+  const [filterDate, setFilterDate] = useState('2026-10-26');
   const [subTab, setSubTab] = useState<'session' | 'general' | 'history'>('session');
-  const [sessionDate, setSessionDate] = useState('2026-10-26');
   const [content, setContent] = useState('');
 
-  const activeStudent = students.find((s) => s.id === selectedStudentId) || students[0];
+  // Tìm các buổi học diễn ra vào ngày filterDate
+  const sessionsOnDate = sessions.filter((s) => s.session_date === filterDate);
+  const activeClassCodesOnDate = sessionsOnDate.map((s) => s.class_code);
+  const activeClassIdsOnDate = sessionsOnDate.map((s) => s.class_id);
 
-  // Lấy lịch sử đánh giá của học viên này
+  // Chỉ lọc những học viên học buổi đó trong ngày được chọn
+  const studentsOnDate = students.filter(
+    (st) =>
+      activeClassCodesOnDate.includes(st.class_code) ||
+      (st.class_id && activeClassIdsOnDate.includes(st.class_id))
+  );
+
+  const [selectedStudentId, setSelectedStudentId] = useState<string>(
+    studentsOnDate[0]?.id || students[0]?.id || ''
+  );
+
+  const activeStudent =
+    students.find((s) => s.id === selectedStudentId) || studentsOnDate[0] || students[0];
+
   const studentEvaluations = evaluations.filter((e) => e.student_id === activeStudent?.id);
 
-  // Điền sẵn nếu đã có đánh giá cho ngày này
   React.useEffect(() => {
-    const existing = evaluations.find(
-      (e) => e.student_id === activeStudent?.id && e.session_date === sessionDate
-    );
-    if (existing) {
-      setContent(existing.content);
-    } else {
-      setContent('');
+    if (activeStudent) {
+      const existing = evaluations.find(
+        (e) => e.student_id === activeStudent.id && e.session_date === filterDate
+      );
+      if (existing) {
+        setContent(existing.content);
+      } else {
+        setContent('');
+      }
     }
-  }, [selectedStudentId, sessionDate, evaluations, activeStudent]);
+  }, [selectedStudentId, filterDate, evaluations, activeStudent]);
 
   const handleSave = () => {
     if (!content.trim()) {
@@ -58,7 +75,7 @@ export default function StudentEvaluationManager() {
       class_id: activeStudent.class_id || '',
       class_code: activeStudent.class_code || 'K98',
       course_name: activeStudent.course_name || 'Model Kids',
-      session_date: sessionDate,
+      session_date: filterDate,
       content: content,
       evaluation_type: subTab === 'general' ? 'general' : 'session',
       created_by: currentUser.full_name,
@@ -73,7 +90,7 @@ export default function StudentEvaluationManager() {
     <div className="space-y-6">
       {/* 2-Panel Layout: Bám sát ảnh tham chiếu số 4 */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* Panel Trái — Danh sách học viên */}
+        {/* Panel Trái — Danh sách học viên có bộ lọc theo ngày */}
         <div className="lg:col-span-4 bg-white rounded-2xl border border-gray-200 p-5 shadow-sm space-y-4">
           <div className="flex items-center justify-between pb-3 border-b border-gray-100">
             <div className="flex items-center space-x-2 text-sm font-bold text-gray-900">
@@ -81,8 +98,27 @@ export default function StudentEvaluationManager() {
               <span>Danh sách học viên</span>
             </div>
             <span className="text-xs px-2.5 py-0.5 rounded-full font-bold bg-red-50 text-brand-500 border border-red-100">
-              {students.length} học viên
+              {studentsOnDate.length} học viên
             </span>
+          </div>
+
+          {/* BỘ LỌC THEO NGÀY THEO YÊU CẦU */}
+          <div className="p-3 bg-gray-50 rounded-xl border border-gray-200 space-y-1.5">
+            <div className="flex items-center space-x-1.5 text-xs font-bold text-gray-700">
+              <Calendar className="w-3.5 h-3.5 text-brand-500" />
+              <span>Lọc học viên có lịch học ngày:</span>
+            </div>
+            <input
+              type="date"
+              value={filterDate}
+              onChange={(e) => {
+                setFilterDate(e.target.value);
+              }}
+              className="w-full px-3 py-1.5 text-xs font-bold bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+            />
+            <p className="text-[10px] text-gray-500 font-medium">
+              Chỉ hiển thị các bạn có lịch học trong ngày {filterDate}
+            </p>
           </div>
 
           <div className="overflow-x-auto">
@@ -96,39 +132,47 @@ export default function StudentEvaluationManager() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 font-medium">
-                {students.map((st, idx) => {
-                  const isSelected = st.id === selectedStudentId;
-                  return (
-                    <tr
-                      key={st.id}
-                      onClick={() => setSelectedStudentId(st.id)}
-                      className={`cursor-pointer transition-colors ${
-                        isSelected ? 'bg-red-50/50' : 'hover:bg-gray-50/60'
-                      }`}
-                    >
-                      <td className="py-3 px-2 text-center text-gray-400 font-bold">{idx + 1}</td>
-                      <td
-                        className={`py-3 px-3 font-bold ${
-                          isSelected ? 'text-brand-500' : 'text-gray-900'
+                {studentsOnDate.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="py-6 text-center text-gray-400 text-xs">
+                      Không có học viên nào có lịch học vào ngày này.
+                    </td>
+                  </tr>
+                ) : (
+                  studentsOnDate.map((st, idx) => {
+                    const isSelected = st.id === selectedStudentId;
+                    return (
+                      <tr
+                        key={st.id}
+                        onClick={() => setSelectedStudentId(st.id)}
+                        className={`cursor-pointer transition-colors ${
+                          isSelected ? 'bg-red-50/50' : 'hover:bg-gray-50/60'
                         }`}
                       >
-                        {st.full_name}
-                      </td>
-                      <td className="py-3 px-3 text-gray-600 font-bold">{st.class_code || 'K98'}</td>
-                      <td className="py-3 px-2 text-right">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSelectedStudentId(st.id);
-                          }}
-                          className="px-3 py-1.5 bg-brand-500 hover:bg-brand-600 text-white font-bold rounded-lg text-xs shadow-sm shadow-red-200 transition-colors"
+                        <td className="py-3 px-2 text-center text-gray-400 font-bold">{idx + 1}</td>
+                        <td
+                          className={`py-3 px-3 font-bold ${
+                            isSelected ? 'text-brand-500' : 'text-gray-900'
+                          }`}
                         >
-                          Đánh giá
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
+                          {st.full_name}
+                        </td>
+                        <td className="py-3 px-3 text-gray-600 font-bold">{st.class_code || 'K98'}</td>
+                        <td className="py-3 px-2 text-right">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedStudentId(st.id);
+                            }}
+                            className="px-3 py-1.5 bg-brand-500 hover:bg-brand-600 text-white font-bold rounded-lg text-xs shadow-sm shadow-red-200 transition-colors"
+                          >
+                            Đánh giá
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
               </tbody>
             </table>
           </div>
@@ -136,21 +180,22 @@ export default function StudentEvaluationManager() {
 
         {/* Panel Phải — Nội dung đánh giá */}
         <div className="lg:col-span-8 bg-white rounded-2xl border border-gray-200 p-6 shadow-sm space-y-6">
-          {/* Header học viên */}
           <div className="pb-4 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
               <div className="flex items-center space-x-3">
-                <h2 className="text-xl font-extrabold text-gray-900">{activeStudent?.full_name}</h2>
+                <h2 className="text-xl font-extrabold text-gray-900">
+                  {activeStudent?.full_name || 'Chọn học viên'}
+                </h2>
                 <span className="text-xs font-bold px-2.5 py-0.5 rounded bg-blue-100 text-blue-800">
                   {activeStudent?.class_code || 'K98'}
                 </span>
               </div>
               <p className="text-xs text-gray-500 mt-1 font-medium">
-                Khóa đào tạo: <strong className="text-gray-800">{activeStudent?.course_name || 'Model Kids'}</strong>
+                Khóa đào tạo:{' '}
+                <strong className="text-gray-800">{activeStudent?.course_name || 'Model Kids'}</strong>
               </p>
             </div>
 
-            {/* 3 Sub-tabs */}
             <div className="flex items-center space-x-2 bg-gray-100 p-1 rounded-xl">
               <button
                 onClick={() => setSubTab('session')}
@@ -185,29 +230,25 @@ export default function StudentEvaluationManager() {
             </div>
           </div>
 
-          {/* Tab: Đánh giá theo buổi hoặc Nhận xét chung */}
           {subTab !== 'history' ? (
             <div className="space-y-4">
-              {/* Buổi học ngày */}
               {subTab === 'session' && (
                 <div className="flex items-center space-x-3">
                   <label className="text-xs font-bold text-gray-700">Buổi học ngày:</label>
                   <div className="relative">
                     <input
                       type="date"
-                      value={sessionDate}
-                      onChange={(e) => setSessionDate(e.target.value)}
+                      value={filterDate}
+                      onChange={(e) => setFilterDate(e.target.value)}
                       className="px-3.5 py-2 text-xs font-bold text-gray-800 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500/20"
                     />
                   </div>
                 </div>
               )}
 
-              {/* Text Editor Toolbar */}
               <div>
                 <label className="block text-xs font-bold text-gray-700 mb-2">Nội dung đánh giá</label>
                 <div className="border border-red-200 rounded-2xl overflow-hidden focus-within:ring-2 focus-within:ring-brand-500/20 focus-within:border-brand-500 transition-all bg-white">
-                  {/* WYSIWYG Mock Toolbar */}
                   <div className="flex items-center space-x-1 p-2 bg-gray-50 border-b border-gray-200 text-gray-600 text-xs">
                     <button
                       type="button"
@@ -261,7 +302,6 @@ export default function StudentEvaluationManager() {
                     </button>
                   </div>
 
-                  {/* Textarea */}
                   <textarea
                     rows={6}
                     maxLength={2000}
@@ -271,14 +311,12 @@ export default function StudentEvaluationManager() {
                     className="w-full p-4 text-xs text-gray-800 placeholder-gray-400 focus:outline-none resize-none leading-relaxed"
                   />
 
-                  {/* Character Counter */}
                   <div className="px-4 py-2 bg-white text-right text-[11px] text-gray-400 font-mono">
                     {content.length}/2000
                   </div>
                 </div>
               </div>
 
-              {/* Gợi ý nội dung đánh giá */}
               <div className="p-4 rounded-xl bg-red-50/50 border border-red-100 text-xs space-y-2">
                 <div className="flex items-center space-x-2 font-bold text-brand-500">
                   <FileText className="w-4 h-4 text-brand-500" />
@@ -292,7 +330,6 @@ export default function StudentEvaluationManager() {
                 </ul>
               </div>
 
-              {/* Actions */}
               <div className="pt-2 flex items-center justify-end space-x-3">
                 <button
                   type="button"
@@ -311,7 +348,6 @@ export default function StudentEvaluationManager() {
               </div>
             </div>
           ) : (
-            /* Tab: Lịch sử đánh giá */
             <div className="space-y-3">
               {studentEvaluations.length === 0 ? (
                 <div className="text-center py-10 text-xs text-gray-400">

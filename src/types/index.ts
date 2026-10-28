@@ -28,6 +28,7 @@ export interface Student {
   total_registered_sessions: number;
   completed_sessions: number;
   remaining_sessions: number;
+  absent_sessions?: number;
   status: 'active' | 'paused' | 'completed';
   intake_date: string;
   created_at: string;
@@ -40,6 +41,7 @@ export interface Course {
   description: string;
   target_audience: string;
   total_sessions: number;
+  image_url?: string;
   status: 'active' | 'inactive';
   created_at: string;
 }
@@ -58,7 +60,7 @@ export interface ClassItem {
   end_date?: string;
   days_of_week: number[]; // 1: Thứ 2, 2: Thứ 3, ..., 7: Chủ nhật
   start_time: string; // e.g. "08:30"
-  end_time: string;   // e.g. "10:00" (Lớp nhóm 1h30, Kèm 1h)
+  end_time: string;   // e.g. "10:00"
   class_type: ClassType;
   total_sessions: number;
   room: string;
@@ -87,12 +89,16 @@ export interface IntakeRecord {
   updated_at?: string;
 }
 
+export type SessionType = 'group' | 'private';
+
 export interface ClassSession {
   id: string;
-  class_id: string;
-  class_code: string;
+  class_id?: string;
+  class_code?: string;
   class_name: string;
   course_name: string;
+  session_type: SessionType;
+  student_name?: string; // Cho lớp private
   session_number: number;
   session_date: string; // YYYY-MM-DD
   day_of_week: number;
@@ -117,6 +123,18 @@ export interface AttendanceRecord {
   notes?: string;
   marked_at?: string;
   marked_by?: string;
+}
+
+export interface LessonPlan {
+  id: string;
+  course_id: string;
+  course_name: string;
+  session_number: number;
+  title: string;
+  content: string; // Nội dung học chi tiết
+  homework_title: string; // Bài tập về nhà đính kèm
+  homework_desc: string; // Yêu cầu bài tập
+  homework_due_days: number; // Hạn nộp sau bao nhiêu ngày
 }
 
 export interface Assignment {
@@ -165,26 +183,16 @@ export interface StudentEvaluation {
 export interface StudentBenefit {
   id: string;
   student_id: string;
-  student_name: string;
   student_code: string;
+  student_name: string;
+  course_name: string;
   class_code: string;
-  course_name: string;
-  total_registered_sessions: number;
+  drive_link?: string; // Giáo viên gắn link Drive
+  status: 'completed' | 'in_progress' | 'overdue';
+  overdue_days?: number; // Số ngày trễ hạn
+  completed_date?: string; // Ngày hoàn thành
+  is_milestone_17?: boolean; // Yêu cầu video quyền lợi buổi 17 cho Model Kids / Catwalk
   completed_sessions: number;
-  remaining_sessions: number;
+  total_registered_sessions: number;
   absent_sessions: number;
-  reserved_sessions: number;
-  expiry_date?: string;
-  status: 'active' | 'expiring_soon' | 'expired';
-}
-
-export interface LessonPlan {
-  id: string;
-  course_id: string;
-  course_name: string;
-  session_number: number;
-  title: string;
-  objectives: string[];
-  activities: string[];
-  materials?: string[];
 }

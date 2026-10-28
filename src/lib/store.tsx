@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState } from 'react';
 import {
   Profile,
   Course,
@@ -27,6 +27,7 @@ import {
   initialAssignments,
   initialEvaluations,
   initialBenefits,
+  initialLessonPlans,
 } from './initialData';
 import { generateStudentCode, generateSessionsForClass } from './utils';
 
@@ -37,7 +38,7 @@ interface Toast {
 }
 
 interface AppContextType {
-  // Current session
+  // Current user
   currentUser: Profile;
   setCurrentUser: (user: Profile) => void;
 
@@ -53,24 +54,41 @@ interface AppContextType {
   submissions: AssignmentSubmission[];
   evaluations: StudentEvaluation[];
   benefits: StudentBenefit[];
+  lessonPlans: LessonPlan[];
 
   // Intake workflow
   addIntakeRecord: (data: { full_name: string; phone: string; course_id: string; total_sessions: number }) => void;
+  editIntakeRecord: (id: string, data: { full_name: string; phone: string; course_id: string; total_sessions: number }) => void;
   assignClassToIntake: (intakeId: string, classId: string) => void;
   generateAccountForIntake: (intakeId: string) => { username: string; tempPass: string; studentCode: string };
 
   // Class & Schedule workflow
   addClass: (newClass: Omit<ClassItem, 'id' | 'student_count' | 'created_at'>) => void;
+  editClass: (id: string, data: Partial<ClassItem>) => void;
+  deleteClass: (id: string) => void;
+
+  addSession: (sessionData: Omit<ClassSession, 'id' | 'status'>) => void;
+  editSession: (id: string, updatedData: Partial<ClassSession>) => void;
   deleteSession: (sessionId: string) => void;
 
   // Attendance workflow
-  saveAttendance: (sessionId: string, classId: string, records: { student_id: string; student_name: string; student_code: string; status: AttendanceStatus; notes?: string }[]) => void;
+  saveAttendance: (
+    sessionId: string,
+    classId: string,
+    records: { student_id: string; student_name: string; student_code: string; status: AttendanceStatus; notes?: string }[]
+  ) => void;
 
   // Evaluation workflow
   saveEvaluation: (data: Omit<StudentEvaluation, 'id' | 'created_at' | 'updated_at'>) => void;
 
   // Assignment workflow
   submitHomework: (assignmentId: string, studentId: string, studentName: string, link: string) => void;
+
+  // Benefits workflow
+  updateBenefit: (id: string, data: { drive_link?: string; status?: 'completed' | 'in_progress' | 'overdue'; completed_date?: string }) => void;
+
+  // Lesson Plans workflow
+  editLessonPlan: (id: string, data: Partial<LessonPlan>) => void;
 
   // Account management
   toggleLockUser: (userId: string) => void;
@@ -80,6 +98,8 @@ interface AppContextType {
 
   // Course management
   addCourse: (course: Omit<Course, 'id' | 'created_at'>) => void;
+  editCourse: (id: string, course: Partial<Course>) => void;
+  deleteCourse: (id: string) => void;
 
   // Notification
   toasts: Toast[];
@@ -90,7 +110,7 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
-  const [currentUser, setCurrentUser] = useState<Profile>(initialProfiles[4]); // Default to Lê Hoàng Thu Thảo or Admin
+  const [currentUser, setCurrentUser] = useState<Profile>(initialProfiles[0]); // Default to Admin
   const [profiles, setProfiles] = useState<Profile[]>(initialProfiles);
   const [courses, setCourses] = useState<Course[]>(initialCourses);
   const [classes, setClasses] = useState<ClassItem[]>(initialClasses);
@@ -102,6 +122,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [submissions, setSubmissions] = useState<AssignmentSubmission[]>([]);
   const [evaluations, setEvaluations] = useState<StudentEvaluation[]>(initialEvaluations);
   const [benefits, setBenefits] = useState<StudentBenefit[]>(initialBenefits);
+  const [lessonPlans, setLessonPlans] = useState<LessonPlan[]>(initialLessonPlans);
 
   const [toasts, setToasts] = useState<Toast[]>([]);
 
@@ -133,6 +154,27 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     setIntakeRecords((prev) => [newRecord, ...prev]);
     showToast(`Đã tiếp nhận hồ sơ học viên ${data.full_name} vào danh sách chờ xếp lớp!`);
+  };
+
+  // Sửa hồ sơ học viên
+  const editIntakeRecord = (id: string, data: { full_name: string; phone: string; course_id: string; total_sessions: number }) => {
+    const course = courses.find((c) => c.id === data.course_id);
+    setIntakeRecords((prev) =>
+      prev.map((item) =>
+        item.id === id
+          ? {
+              ...item,
+              full_name: data.full_name,
+              phone: data.phone,
+              course_id: data.course_id,
+              course_name: course ? course.name : item.course_name,
+              total_sessions: data.total_sessions,
+              updated_at: new Date().toISOString(),
+            }
+          : item
+      )
+    );
+    showToast('Đã cập nhật thông tin học viên thành công!');
   };
 
   // 2. Xếp lớp cho hồ sơ
@@ -203,6 +245,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       total_registered_sessions: intake.total_sessions,
       completed_sessions: 0,
       remaining_sessions: intake.total_sessions,
+      absent_sessions: 0,
       status: 'active',
       intake_date: intake.created_at,
       created_at: new Date().toISOString(),
@@ -217,7 +260,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       );
     }
 
-    // 4. Tạo quyền lợi học viên
+    // 4. Tạo quyền lợi học viên (cột mốc buổi 17 cho Model Kids/Catwalk)
+    const isMilestone = intake.course_name.includes('Model Kids') || intake.course_name.includes('Catwalk');
     const newBenefit: StudentBenefit = {
       id: `ben-${Date.now()}`,
       student_id: newStudent.id,
@@ -225,13 +269,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       student_code: studentCode,
       class_code: intake.assigned_class_code || '',
       course_name: intake.course_name,
-      total_registered_sessions: intake.total_sessions,
+      drive_link: '',
+      status: 'in_progress',
+      is_milestone_17: isMilestone,
       completed_sessions: 0,
-      remaining_sessions: intake.total_sessions,
+      total_registered_sessions: intake.total_sessions,
       absent_sessions: 0,
-      reserved_sessions: 0,
-      expiry_date: new Date(Date.now() + 180 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      status: 'active',
+      overdue_days: 0,
+      completed_date: '',
     };
 
     // Cập nhật trạng thái intake
@@ -266,7 +311,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       created_at: new Date().toISOString(),
     };
 
-    // Tự sinh các buổi học
     const generatedSessions = generateSessionsForClass(
       classId,
       newClass.code,
@@ -287,19 +331,55 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     showToast(`Đã tạo lớp ${newClass.code} và tự động sinh ${generatedSessions.length} buổi học trên Thời khóa biểu!`);
   };
 
-  const deleteSession = (sessionId: string) => {
-    setSessions((prev) => prev.filter((s) => s.id !== sessionId));
-    showToast('Đã xóa buổi học khỏi thời khóa biểu', 'info');
+  const editClass = (id: string, data: Partial<ClassItem>) => {
+    setClasses((prev) => prev.map((c) => (c.id === id ? { ...c, ...data } : c)));
+    showToast('Đã cập nhật thông tin lớp học thành công!');
   };
 
-  // 5. Lưu điểm danh
+  const deleteClass = (id: string) => {
+    setClasses((prev) => prev.filter((c) => c.id !== id));
+    setSessions((prev) => prev.filter((s) => s.class_id !== id));
+    showToast('Đã xóa lớp học và lịch học tương ứng', 'info');
+  };
+
+  // Thêm buổi học thủ công (GROUP hoặc PRIVATE)
+  const addSession = (sessionData: Omit<ClassSession, 'id' | 'status'>) => {
+    const newSession: ClassSession = {
+      ...sessionData,
+      id: `sess-manual-${Date.now()}`,
+      status: 'scheduled',
+    };
+    setSessions((prev) => [...prev, newSession]);
+    showToast(`Đã thêm lịch dạy ${sessionData.session_type === 'private' ? 'kèm 1-1' : 'lớp nhóm'} thành công!`);
+  };
+
+  // Chỉnh sửa buổi học (thay đổi giờ, đổi cô giáo dạy thay...)
+  const editSession = (id: string, updatedData: Partial<ClassSession>) => {
+    setSessions((prev) => prev.map((s) => (s.id === id ? { ...s, ...updatedData } : s)));
+    showToast('Đã cập nhật thông tin buổi học thành công!');
+  };
+
+  const deleteSession = (sessionId: string) => {
+    setSessions((prev) => prev.filter((s) => s.id !== sessionId));
+    showToast('Đã xóa buổi học khỏi thời khóa biểu (lớp nghỉ)', 'info');
+  };
+
+  // 5. Lưu điểm danh theo NGUYÊN TẮC:
+  // - Có mặt: tính buổi học (+1 completed_sessions)
+  // - Vắng: không tính buổi học, nhưng hiện bên buổi vắng (+1 absent_sessions)
+  // - Không điểm danh: không tính
+  // - Khi điểm danh xong buổi nào -> mở khóa bài tập buổi đó từ giáo án!
   const saveAttendance = (
     sessionId: string,
     classId: string,
     records: { student_id: string; student_name: string; student_code: string; status: AttendanceStatus; notes?: string }[]
   ) => {
+    // Đánh dấu session này đã hoàn thành điểm danh
+    setSessions((prev) =>
+      prev.map((s) => (s.id === sessionId ? { ...s, status: 'completed' } : s))
+    );
+
     setAttendance((prev) => {
-      // Xóa các bản ghi cũ của session này để không bị trùng
       const filtered = prev.filter((r) => r.session_id !== sessionId);
       const newRecords: AttendanceRecord[] = records.map((item) => ({
         id: `att-${sessionId}-${item.student_id}`,
@@ -316,7 +396,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       return [...filtered, ...newRecords];
     });
 
-    // Cập nhật số buổi đã học / vắng trong quyền lợi & hồ sơ học viên
+    // Cập nhật số buổi hoàn thành / vắng
     records.forEach((rec) => {
       if (rec.status === 'present') {
         setStudents((prev) =>
@@ -336,21 +416,62 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
               ? {
                   ...b,
                   completed_sessions: b.completed_sessions + 1,
-                  remaining_sessions: Math.max(0, b.remaining_sessions - 1),
+                  remaining_sessions: Math.max(0, b.total_registered_sessions - (b.completed_sessions + 1)),
                 }
               : b
           )
         );
       } else if (rec.status === 'absent') {
+        setStudents((prev) =>
+          prev.map((s) =>
+            s.id === rec.student_id
+              ? { ...s, absent_sessions: (s.absent_sessions || 0) + 1 }
+              : s
+          )
+        );
         setBenefits((prev) =>
           prev.map((b) =>
-            b.student_id === rec.student_id ? { ...b, absent_sessions: b.absent_sessions + 1 } : b
+            b.student_id === rec.student_id
+              ? { ...b, absent_sessions: b.absent_sessions + 1 }
+              : b
           )
         );
       }
     });
 
-    showToast('Đã lưu dữ liệu điểm danh thành công!');
+    // Tự động mở khóa bài tập tương ứng cho buổi học vừa điểm danh xong!
+    const targetSession = sessions.find((s) => s.id === sessionId);
+    const sessionNum = targetSession ? targetSession.session_number : 1;
+    const plan = lessonPlans.find((lp) => lp.session_number === sessionNum);
+
+    setAssignments((prev) => {
+      const exists = prev.some((a) => a.session_number === sessionNum && a.class_id === classId);
+      if (exists) {
+        return prev.map((a) =>
+          a.session_number === sessionNum && a.class_id === classId ? { ...a, is_unlocked: true } : a
+        );
+      } else if (plan) {
+        const newAsg: Assignment = {
+          id: `asg-${classId}-${sessionNum}`,
+          class_id: classId,
+          session_id: sessionId,
+          session_number: sessionNum,
+          title: plan.homework_title,
+          description: plan.homework_desc,
+          requirements: ['Thực hiện video theo đúng giáo án', 'Tải lên Google Drive'],
+          notes: `Hạn nộp bài sau ${plan.homework_due_days} ngày kể từ buổi học.`,
+          due_date: new Date(Date.now() + plan.homework_due_days * 24 * 60 * 60 * 1000)
+            .toISOString()
+            .split('T')[0],
+          is_unlocked: true, // MỞ KHÓA TỨC THÌ
+          created_at: new Date().toISOString(),
+        };
+        return [...prev, newAsg];
+      }
+      return prev;
+    });
+
+    showToast('Đã lưu dữ liệu điểm danh và mở khóa bài tập buổi học này!');
   };
 
   // 6. Lưu đánh giá học viên
@@ -395,7 +516,21 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     showToast('Đã nộp link bài tập thành công!');
   };
 
-  // 8. Quản lý tài khoản
+  // 8. Cập nhật quyền lợi học viên (gắn link Drive, tình trạng...)
+  const updateBenefit = (id: string, data: { drive_link?: string; status?: 'completed' | 'in_progress' | 'overdue'; completed_date?: string }) => {
+    setBenefits((prev) =>
+      prev.map((b) => (b.id === id ? { ...b, ...data } : b))
+    );
+    showToast('Đã cập nhật quyền lợi & link Drive cho học viên!');
+  };
+
+  // 9. Chỉnh sửa giáo án
+  const editLessonPlan = (id: string, data: Partial<LessonPlan>) => {
+    setLessonPlans((prev) => prev.map((lp) => (lp.id === id ? { ...lp, ...data } : lp)));
+    showToast('Đã cập nhật nội dung giáo án và bài tập về nhà!');
+  };
+
+  // 10. Quản lý tài khoản
   const toggleLockUser = (userId: string) => {
     setProfiles((prev) =>
       prev.map((p) => {
@@ -417,7 +552,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const deleteUser = (userId: string) => {
     setProfiles((prev) => prev.filter((p) => p.id !== userId));
-    showToast('Đã vô hiệu hóa tài khoản thành công', 'info');
+    showToast('Đã xóa tài khoản khỏi hệ thống', 'info');
   };
 
   const createNewAccount = (data: { full_name: string; username: string; role: 'admin' | 'teacher' | 'student'; phone: string; email: string }) => {
@@ -446,6 +581,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     showToast(`Đã tạo khóa học ${newCourse.name} thành công!`);
   };
 
+  const editCourse = (id: string, courseData: Partial<Course>) => {
+    setCourses((prev) => prev.map((c) => (c.id === id ? { ...c, ...courseData } : c)));
+    showToast('Đã cập nhật thông tin khóa học thành công!');
+  };
+
+  const deleteCourse = (id: string) => {
+    setCourses((prev) => prev.filter((c) => c.id !== id));
+    showToast('Đã xóa khóa học', 'info');
+  };
+
   return (
     <AppContext.Provider
       value={{
@@ -462,19 +607,29 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         submissions,
         evaluations,
         benefits,
+        lessonPlans,
         addIntakeRecord,
+        editIntakeRecord,
         assignClassToIntake,
         generateAccountForIntake,
         addClass,
+        editClass,
+        deleteClass,
+        addSession,
+        editSession,
         deleteSession,
         saveAttendance,
         saveEvaluation,
         submitHomework,
+        updateBenefit,
+        editLessonPlan,
         toggleLockUser,
         resetUserPassword,
         deleteUser,
         createNewAccount,
         addCourse,
+        editCourse,
+        deleteCourse,
         toasts,
         showToast,
         dismissToast,

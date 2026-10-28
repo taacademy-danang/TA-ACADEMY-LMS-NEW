@@ -1,46 +1,77 @@
 'use client';
 
-import React from 'react';
-import { Gift, Award, CheckCircle, Clock, ShieldCheck, AlertCircle } from 'lucide-react';
+import React, { useState } from 'react';
+import {
+  Gift,
+  Award,
+  CheckCircle,
+  Clock,
+  ShieldCheck,
+  AlertCircle,
+  ExternalLink,
+  Edit2,
+  X,
+  Link as LinkIcon,
+} from 'lucide-react';
 import { useApp } from '@/lib/store';
+import { StudentBenefit } from '@/types';
 
 export default function BenefitsManager() {
-  const { benefits, students } = useApp();
+  const { benefits, updateBenefit, showToast } = useApp();
+
+  const [editingBenefit, setEditingBenefit] = useState<StudentBenefit | null>(null);
+  const [driveLinkInput, setDriveLinkInput] = useState('');
+  const [statusInput, setStatusInput] = useState<'completed' | 'in_progress' | 'overdue'>('in_progress');
+  const [completedDateInput, setCompletedDateInput] = useState('');
+
+  const handleOpenEdit = (b: StudentBenefit) => {
+    setEditingBenefit(b);
+    setDriveLinkInput(b.drive_link || '');
+    setStatusInput(b.status || 'in_progress');
+    setCompletedDateInput(b.completed_date || '');
+  };
+
+  const handleSave = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingBenefit) return;
+
+    updateBenefit(editingBenefit.id, {
+      drive_link: driveLinkInput.trim(),
+      status: statusInput,
+      completed_date: statusInput === 'completed' ? completedDateInput || new Date().toLocaleDateString('vi-VN') : '',
+    });
+
+    setEditingBenefit(null);
+  };
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight">Quyền Lợi Học Viên</h1>
         <p className="text-sm text-gray-500 mt-0.5">
-          Quản lý số buổi đăng ký, số buổi đã tham gia, bảo lưu và thời hạn đào tạo
+          Quản lý quyền lợi video tốt nghiệp, link Google Drive và tiến độ hoàn thành đào tạo
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="p-5 bg-white rounded-2xl border border-gray-200 shadow-sm space-y-2">
-          <span className="text-xs font-bold text-gray-400 uppercase">Tổng số học viên có quyền lợi</span>
-          <div className="text-2xl font-extrabold text-gray-900">{benefits.length} học viên</div>
-          <p className="text-xs text-emerald-600 font-medium">100% hồ sơ đã được đồng bộ tự động</p>
+      {/* Thông báo quy tắc mốc buổi 17 */}
+      <div className="p-4 bg-red-50/60 rounded-2xl border border-red-200 text-xs text-brand-900 space-y-1">
+        <div className="flex items-center space-x-2 font-bold text-brand-500">
+          <AlertCircle className="w-4 h-4 text-brand-500" />
+          <span>QUY TẮC BẮT BUỘC VỀ VIDEO QUYỀN LỢI T.A ACADEMY:</span>
         </div>
-
-        <div className="p-5 bg-white rounded-2xl border border-gray-200 shadow-sm space-y-2">
-          <span className="text-xs font-bold text-gray-400 uppercase">Chính sách bảo lưu</span>
-          <div className="text-2xl font-extrabold text-brand-500">Tối đa 60 ngày</div>
-          <p className="text-xs text-gray-500">Áp dụng cho học viên có lý do chính đáng</p>
-        </div>
-
-        <div className="p-5 bg-white rounded-2xl border border-gray-200 shadow-sm space-y-2">
-          <span className="text-xs font-bold text-gray-400 uppercase">Học bù & Luyện tập thêm</span>
-          <div className="text-2xl font-extrabold text-blue-700">Miễn phí 2 buổi</div>
-          <p className="text-xs text-gray-500">Hỗ trợ học viên theo kịp tiến độ cả lớp</p>
-        </div>
+        <p className="leading-relaxed">
+          Đối với hai khóa học <strong>Model Kids</strong> và <strong>Catwalk</strong>, học viên phải được ghi hình và gắn link Google Drive video quyền lợi vào <strong>buổi học thứ 17</strong> (lấy mốc buổi 17 làm chuẩn bàn giao). Nếu quá thời hạn này mà giáo viên chưa gắn link, hệ thống sẽ tự động cảnh báo số ngày trễ hạn.
+        </p>
       </div>
 
+      {/* Bảng quyền lợi chính thức với các cột đúng yêu cầu */}
       <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm">
         <div className="p-4 border-b border-gray-100 flex justify-between items-center">
-          <h3 className="font-bold text-sm text-gray-900">Chi tiết quyền lợi từng học viên</h3>
+          <h3 className="font-bold text-sm text-gray-900">
+            Danh sách quyền lợi học viên ({benefits.length} hồ sơ)
+          </h3>
           <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-red-50 text-brand-500">
-            Dữ liệu trực tiếp từ hệ thống
+            Chuẩn bàn giao 2026
           </span>
         </div>
 
@@ -48,43 +79,188 @@ export default function BenefitsManager() {
           <table className="w-full text-left text-xs">
             <thead className="bg-gray-50/70 border-b border-gray-200 text-gray-400 font-bold uppercase text-[11px]">
               <tr>
-                <th className="py-3 px-4">Mã HV</th>
+                <th className="py-3 px-4">Mã học viên</th>
                 <th className="py-3 px-4">Họ và tên</th>
                 <th className="py-3 px-4">Khóa đào tạo</th>
-                <th className="py-3 px-4 text-center">Tổng buổi đăng ký</th>
-                <th className="py-3 px-4 text-center">Đã hoàn thành</th>
-                <th className="py-3 px-4 text-center">Số buổi còn lại</th>
-                <th className="py-3 px-4 text-center">Hạn đào tạo</th>
-                <th className="py-3 px-4 text-center">Trạng thái</th>
+                <th className="py-3 px-4">Mã lớp</th>
+                <th className="py-3 px-4">Link Drive (GV gắn)</th>
+                <th className="py-3 px-4 text-center">Tình trạng & Trễ hạn</th>
+                <th className="py-3 px-4 text-center">Ngày hoàn thành</th>
+                <th className="py-3 px-4 text-right">Thao tác</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 font-medium">
-              {benefits.map((b) => (
-                <tr key={b.id} className="hover:bg-gray-50/50">
-                  <td className="py-3.5 px-4 font-mono font-bold text-brand-500">{b.student_code}</td>
-                  <td className="py-3.5 px-4 font-bold text-gray-900">{b.student_name}</td>
-                  <td className="py-3.5 px-4 text-gray-700">{b.course_name} ({b.class_code})</td>
-                  <td className="py-3.5 px-4 text-center font-bold text-gray-900">
-                    {b.total_registered_sessions} buổi
-                  </td>
-                  <td className="py-3.5 px-4 text-center font-bold text-blue-600">
-                    {b.completed_sessions} buổi
-                  </td>
-                  <td className="py-3.5 px-4 text-center font-extrabold text-emerald-600">
-                    {b.remaining_sessions} buổi
-                  </td>
-                  <td className="py-3.5 px-4 text-center text-gray-500">{b.expiry_date || '30/04/2027'}</td>
-                  <td className="py-3.5 px-4 text-center">
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-100 text-emerald-800">
-                      Hiệu lực
-                    </span>
-                  </td>
-                </tr>
-              ))}
+              {benefits.map((b) => {
+                const isMilestoneCourse =
+                  b.course_name.includes('Model Kids') || b.course_name.includes('Catwalk');
+
+                return (
+                  <tr key={b.id} className="hover:bg-gray-50/50">
+                    {/* Cột 1: Mã học viên */}
+                    <td className="py-3.5 px-4 font-mono font-bold text-brand-500">
+                      {b.student_code}
+                    </td>
+
+                    {/* Cột 2: Họ và tên */}
+                    <td className="py-3.5 px-4 font-bold text-gray-900">
+                      {b.student_name}
+                      {isMilestoneCourse && (
+                        <div className="text-[10px] text-amber-700 font-semibold mt-0.5">
+                          ★ Mốc video: Buổi 17
+                        </div>
+                      )}
+                    </td>
+
+                    {/* Cột 3: Khóa đào tạo */}
+                    <td className="py-3.5 px-4 text-gray-800">{b.course_name}</td>
+
+                    {/* Cột 4: Mã lớp */}
+                    <td className="py-3.5 px-4 font-extrabold text-blue-700">{b.class_code}</td>
+
+                    {/* Cột 5: Link Drive */}
+                    <td className="py-3.5 px-4 max-w-xs">
+                      {b.drive_link ? (
+                        <a
+                          href={b.drive_link}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center space-x-1.5 text-blue-600 hover:text-blue-800 font-semibold truncate hover:underline"
+                        >
+                          <LinkIcon className="w-3.5 h-3.5 shrink-0" />
+                          <span className="truncate">Mở thư mục video Drive</span>
+                          <ExternalLink className="w-3 h-3 shrink-0" />
+                        </a>
+                      ) : (
+                        <span className="text-gray-400 italic">Chưa gắn link video</span>
+                      )}
+                    </td>
+
+                    {/* Cột 6: Tình trạng & Trễ hạn */}
+                    <td className="py-3.5 px-4 text-center">
+                      {b.status === 'completed' && (
+                        <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 font-bold text-[11px]">
+                          <CheckCircle className="w-3.5 h-3.5 text-emerald-700" />
+                          <span>Hoàn thành</span>
+                        </span>
+                      )}
+                      {b.status === 'in_progress' && (
+                        <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full bg-blue-100 text-blue-800 font-bold text-[11px]">
+                          <Clock className="w-3.5 h-3.5 text-blue-700" />
+                          <span>Đang thực hiện</span>
+                        </span>
+                      )}
+                      {b.status === 'overdue' && (
+                        <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full bg-red-100 text-brand-500 font-bold text-[11px]">
+                          <AlertCircle className="w-3.5 h-3.5 text-brand-500" />
+                          <span>Trễ hạn {b.overdue_days || 1} ngày</span>
+                        </span>
+                      )}
+                    </td>
+
+                    {/* Cột 7: Ngày hoàn thành */}
+                    <td className="py-3.5 px-4 text-center font-medium text-gray-700">
+                      {b.completed_date || '—'}
+                    </td>
+
+                    {/* Cột 8: Thao tác gắn link */}
+                    <td className="py-3.5 px-4 text-right">
+                      <button
+                        onClick={() => handleOpenEdit(b)}
+                        className="inline-flex items-center space-x-1 px-3 py-1.5 text-xs font-bold text-gray-700 hover:text-brand-500 hover:bg-red-50 border border-gray-200 hover:border-red-200 rounded-lg transition-colors"
+                      >
+                        <Edit2 className="w-3.5 h-3.5" />
+                        <span>Gắn Link Drive</span>
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
       </div>
+
+      {/* Modal Giáo viên gắn Link Drive & Cập nhật tình trạng */}
+      {editingBenefit && (
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-gray-100">
+            <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+              <div>
+                <h3 className="font-extrabold text-gray-900 text-base">
+                  Cập nhật quyền lợi video học viên
+                </h3>
+                <p className="text-xs text-gray-500">
+                  {editingBenefit.student_name} ({editingBenefit.student_code})
+                </p>
+              </div>
+              <button
+                onClick={() => setEditingBenefit(null)}
+                className="text-gray-400 hover:text-gray-600 p-1 rounded-lg"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSave} className="mt-4 space-y-3.5">
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">
+                  Đường dẫn Google Drive video quyền lợi <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="url"
+                  placeholder="https://drive.google.com/..."
+                  value={driveLinkInput}
+                  onChange={(e) => setDriveLinkInput(e.target.value)}
+                  className="w-full px-3 py-2 text-xs bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">Tình trạng bàn giao</label>
+                <select
+                  value={statusInput}
+                  onChange={(e) =>
+                    setStatusInput(e.target.value as 'completed' | 'in_progress' | 'overdue')
+                  }
+                  className="w-full px-3 py-2 text-xs bg-gray-50 border border-gray-200 rounded-xl"
+                >
+                  <option value="in_progress">Đang thực hiện (Chưa hoàn thành)</option>
+                  <option value="completed">Đã hoàn thành</option>
+                  <option value="overdue">Trễ hạn bàn giao</option>
+                </select>
+              </div>
+
+              {statusInput === 'completed' && (
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">Ngày hoàn thành</label>
+                  <input
+                    type="date"
+                    value={completedDateInput}
+                    onChange={(e) => setCompletedDateInput(e.target.value)}
+                    className="w-full px-3 py-2 text-xs bg-gray-50 border border-gray-200 rounded-xl"
+                  />
+                </div>
+              )}
+
+              <div className="pt-3 flex justify-end space-x-2 border-t border-gray-100">
+                <button
+                  type="button"
+                  onClick={() => setEditingBenefit(null)}
+                  className="px-4 py-2 text-xs font-bold text-gray-600 hover:bg-gray-100 rounded-xl"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 text-xs font-bold text-white bg-brand-500 hover:bg-brand-600 rounded-xl shadow-md shadow-red-200"
+                >
+                  Lưu quyền lợi
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

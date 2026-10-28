@@ -1,6 +1,40 @@
-import { Profile, Course, ClassItem, IntakeRecord, Student, ClassSession, AttendanceRecord, Assignment, StudentEvaluation, StudentBenefit, LessonPlan } from '@/types';
+import {
+  Profile,
+  Course,
+  ClassItem,
+  IntakeRecord,
+  Student,
+  ClassSession,
+  AttendanceRecord,
+  Assignment,
+  StudentEvaluation,
+  StudentBenefit,
+  LessonPlan,
+} from '@/types';
 
 export const initialProfiles: Profile[] = [
+  {
+    id: 'p-admin-01',
+    email: 'admin@taacademy.vn',
+    username: 'admin',
+    full_name: 'Ban Giám Đốc T.A (Admin)',
+    role: 'admin',
+    phone: '0901234567',
+    status: 'active',
+    created_at: '2026-09-01T08:00:00Z',
+    updated_at: '2026-09-01T08:00:00Z',
+  },
+  {
+    id: 'p-gv-03',
+    email: 'vongocnhuy@ta.edu.vn',
+    username: 'vongocnhuy',
+    full_name: 'Võ Ngọc Như Ý',
+    role: 'teacher',
+    phone: '0908889903',
+    status: 'active',
+    created_at: '2026-10-03T08:00:00Z',
+    updated_at: '2026-10-03T08:00:00Z',
+  },
   {
     id: 'p-gv-01',
     email: 'khauthinga@ta.edu.vn',
@@ -22,17 +56,6 @@ export const initialProfiles: Profile[] = [
     status: 'active',
     created_at: '2026-10-02T08:00:00Z',
     updated_at: '2026-10-02T08:00:00Z',
-  },
-  {
-    id: 'p-gv-03',
-    email: 'vongocnhuy@ta.edu.vn',
-    username: 'vongocnhuy',
-    full_name: 'Võ Ngọc Như Ý',
-    role: 'teacher',
-    phone: '0908889903',
-    status: 'active',
-    created_at: '2026-10-03T08:00:00Z',
-    updated_at: '2026-10-03T08:00:00Z',
   },
   {
     id: 'p-gv-04',
@@ -57,30 +80,9 @@ export const initialProfiles: Profile[] = [
     created_at: '2026-10-20T09:30:00Z',
     updated_at: '2026-10-20T09:30:00Z',
   },
-  {
-    id: 'p-admin-01',
-    email: 'admin@taacademy.vn',
-    username: 'admin',
-    full_name: 'Ban Giám Đốc T.A',
-    role: 'admin',
-    phone: '0901234567',
-    status: 'active',
-    created_at: '2026-09-01T08:00:00Z',
-    updated_at: '2026-09-01T08:00:00Z',
-  }
 ];
 
 export const initialCourses: Course[] = [
-  {
-    id: 'c-mk',
-    code: 'MK',
-    name: 'Model Kids',
-    description: 'Đào tạo kỹ năng người mẫu nhí, dáng đi, giải phóng hình thể và sự tự tin sân khấu.',
-    target_audience: 'Trẻ em từ 4 - 14 tuổi',
-    total_sessions: 16,
-    status: 'active',
-    created_at: '2026-01-01T00:00:00Z',
-  },
   {
     id: 'c-pt',
     code: 'PT',
@@ -88,29 +90,43 @@ export const initialCourses: Course[] = [
     description: 'Chương trình rèn luyện cốt cách, dáng ngồi, dáng đứng và giao tiếp thanh lịch chuẩn mực.',
     target_audience: 'Nữ giới, thanh thiếu niên, phụ nữ hiện đại',
     total_sessions: 12,
+    image_url: '/images/phong-thai.png',
     status: 'active',
     created_at: '2026-01-01T00:00:00Z',
   },
   {
     id: 'c-cw',
     code: 'CW',
-    name: 'Catwalk nâng cao',
+    name: 'Catwalk',
     description: 'Kỹ thuật trình diễn thời trang chuyên nghiệp, catwalk đầm dạ hội, áo dài và phong cách biểu cảm.',
     target_audience: 'Học viên muốn biểu diễn chuyên nghiệp',
     total_sessions: 16,
+    image_url: '/images/catwalk.png',
+    status: 'active',
+    created_at: '2026-01-01T00:00:00Z',
+  },
+  {
+    id: 'c-mk',
+    code: 'MK',
+    name: 'Model Kids',
+    description: 'Đào tạo kỹ năng người mẫu nhí, dáng đi, giải phóng hình thể và sự tự tin sân khấu.',
+    target_audience: 'Trẻ em từ 4 - 14 tuổi',
+    total_sessions: 16,
+    image_url: '/images/model-kids.png',
     status: 'active',
     created_at: '2026-01-01T00:00:00Z',
   },
   {
     id: 'c-gt',
     code: 'GT',
-    name: 'Giao tiếp',
+    name: 'Giao tiếp & Giọng nói',
     description: 'Nghệ thuật làm chủ giọng nói, ngôn ngữ hình thể và thuyết trình lôi cuốn trước đám đông.',
     target_audience: 'Mọi lứa tuổi',
     total_sessions: 10,
+    image_url: '/images/phong-thai.png',
     status: 'active',
     created_at: '2026-01-01T00:00:00Z',
-  }
+  },
 ];
 
 export const initialClasses: ClassItem[] = [
@@ -123,9 +139,9 @@ export const initialClasses: ClassItem[] = [
     teacher_id: 'p-gv-03',
     teacher_name: 'Võ Ngọc Như Ý',
     start_date: '2026-10-26',
-    days_of_week: [1, 3], // Thứ 2, Thứ 4
+    days_of_week: [1, 3],
     start_time: '08:30',
-    end_time: '10:00', // Lớp nhóm 1h30
+    end_time: '10:00',
     class_type: 'group',
     total_sessions: 16,
     room: 'Phòng Studio A1',
@@ -138,7 +154,7 @@ export const initialClasses: ClassItem[] = [
     code: 'C12',
     name: 'C12 – CATWALK NÂNG CAO',
     course_id: 'c-cw',
-    course_name: 'Catwalk nâng cao',
+    course_name: 'Catwalk',
     teacher_id: 'p-gv-03',
     teacher_name: 'Võ Ngọc Như Ý',
     start_date: '2026-10-27',
@@ -157,7 +173,7 @@ export const initialClasses: ClassItem[] = [
     code: 'G5',
     name: 'G5 – GIAO TIẾP',
     course_id: 'c-gt',
-    course_name: 'Giao tiếp',
+    course_name: 'Giao tiếp & Giọng nói',
     teacher_id: 'p-gv-03',
     teacher_name: 'Võ Ngọc Như Ý',
     start_date: '2026-10-27',
@@ -208,7 +224,7 @@ export const initialClasses: ClassItem[] = [
     status: 'ongoing',
     student_count: 0,
     created_at: '2026-10-19T00:00:00Z',
-  }
+  },
 ];
 
 export const initialStudents: Student[] = [
@@ -226,10 +242,11 @@ export const initialStudents: Student[] = [
     total_registered_sessions: 16,
     completed_sessions: 1,
     remaining_sessions: 15,
+    absent_sessions: 0,
     status: 'active',
     intake_date: '2026-10-25T10:00:00Z',
     created_at: '2026-10-25T10:00:00Z',
-  }
+  },
 ];
 
 export const initialIntakeRecords: IntakeRecord[] = [
@@ -240,7 +257,7 @@ export const initialIntakeRecords: IntakeRecord[] = [
     course_id: 'c-mk',
     course_name: 'Model Kids',
     total_sessions: 16,
-    status: 'assigned_class', // Đã xếp lớp (Chờ cấp TK)
+    status: 'assigned_class',
     assigned_class_id: 'cls-k98',
     assigned_class_code: 'K98',
     assigned_class_name: 'K98 – MODEL KIDS',
@@ -248,7 +265,7 @@ export const initialIntakeRecords: IntakeRecord[] = [
     student_code: 'TA-STD-998',
     account_username: '0933889900',
     created_at: '2026-10-25T10:00:00Z',
-  }
+  },
 ];
 
 export const initialSessions: ClassSession[] = [
@@ -258,6 +275,7 @@ export const initialSessions: ClassSession[] = [
     class_code: 'K98',
     class_name: 'K98 – MODEL KIDS',
     course_name: 'Model Kids',
+    session_type: 'group',
     session_number: 1,
     session_date: '2026-10-26',
     day_of_week: 1,
@@ -266,7 +284,7 @@ export const initialSessions: ClassSession[] = [
     teacher_id: 'p-gv-03',
     teacher_name: 'Võ Ngọc Như Ý',
     room: 'Phòng Studio A1',
-    status: 'completed',
+    status: 'completed', // Đã điểm danh xong -> mở khóa bài tập buổi 1!
   },
   {
     id: 'sess-02',
@@ -274,6 +292,7 @@ export const initialSessions: ClassSession[] = [
     class_code: 'K98',
     class_name: 'K98 – MODEL KIDS',
     course_name: 'Model Kids',
+    session_type: 'group',
     session_number: 2,
     session_date: '2026-10-28',
     day_of_week: 3,
@@ -290,6 +309,7 @@ export const initialSessions: ClassSession[] = [
     class_code: 'K96',
     class_name: 'MODEL KIDS – K96',
     course_name: 'Model Kids',
+    session_type: 'group',
     session_number: 1,
     session_date: '2026-10-28',
     day_of_week: 3,
@@ -306,6 +326,7 @@ export const initialSessions: ClassSession[] = [
     class_code: 'K98',
     class_name: 'K98 – MODEL KIDS',
     course_name: 'Model Kids',
+    session_type: 'group',
     session_number: 2,
     session_date: '2026-10-28',
     day_of_week: 3,
@@ -315,7 +336,7 @@ export const initialSessions: ClassSession[] = [
     teacher_name: 'Võ Ngọc Như Ý',
     room: 'Phòng Studio A1',
     status: 'scheduled',
-  }
+  },
 ];
 
 export const initialAttendance: AttendanceRecord[] = [
@@ -330,39 +351,88 @@ export const initialAttendance: AttendanceRecord[] = [
     notes: 'Học tập hăng hái, bước đi thẳng hàng',
     marked_at: '2026-10-26T10:05:00Z',
     marked_by: 'p-gv-03',
-  }
+  },
+];
+
+export const initialLessonPlans: LessonPlan[] = [
+  {
+    id: 'lp-mk-01',
+    course_id: 'c-mk',
+    course_name: 'Model Kids',
+    session_number: 1,
+    title: 'Khai phóng sự tự tin & Dáng đứng chuẩn',
+    content: 'Hướng dẫn làm quen với thảm runway, cách giữ thẳng lưng, vai mở rộng và mắt nhìn thẳng vào điểm tiêu cự trước mặt.',
+    homework_title: 'Quay video thực hành dáng đi Runway cơ bản',
+    homework_desc: 'Quay video 10 bước đi Runway thẳng hàng, đánh tay tự nhiên, dừng tạo dáng (Pose) 3 giây ở cuối thảm đỏ.',
+    homework_due_days: 4,
+  },
+  {
+    id: 'lp-mk-02',
+    course_id: 'c-mk',
+    course_name: 'Model Kids',
+    session_number: 2,
+    title: 'Kỹ thuật bước chân trên đường thẳng & Nhịp điệu',
+    content: 'Cách đặt mũi chân trước gót chân nhẹ nhàng theo tiếng nhạc, kiểm soát tốc độ bước chân không quá nhanh.',
+    homework_title: 'Luyện bước đi theo nhịp nhạc sôi động',
+    homework_desc: 'Bật nhạc Model Kids tại nhà và quay video sải bước 15 nhịp đúng phách nhạc.',
+    homework_due_days: 4,
+  },
+  {
+    id: 'lp-mk-03',
+    course_id: 'c-mk',
+    course_name: 'Model Kids',
+    session_number: 3,
+    title: 'Nghệ thuật Pose dáng thương mại & Thời trang',
+    content: 'Thực hành 3 dáng Pose thương mại (cười rạng rỡ, tay đặt hông) và 3 dáng Pose thời trang cao cấp.',
+    homework_title: 'Chụp 6 bức ảnh Pose dáng chuẩn',
+    homework_desc: 'Chụp 3 ảnh Pose thương mại và 3 ảnh Pose thời trang nộp lên Google Drive.',
+    homework_due_days: 5,
+  },
+  {
+    id: 'lp-mk-17',
+    course_id: 'c-mk',
+    course_name: 'Model Kids',
+    session_number: 17,
+    title: 'Buổi 17: Video Quyền Lợi & Báo cáo tốt nghiệp',
+    content: 'Ghi hình chuyên nghiệp toàn bộ phần catwalk cá nhân của học viên với trang phục chính thức.',
+    homework_title: 'Video quyền lợi tốt nghiệp đính kèm Link Drive',
+    homework_desc: 'Giáo viên phụ trách gắn link video chất lượng cao vào bảng Quyền lợi học viên.',
+    homework_due_days: 7,
+  },
 ];
 
 export const initialAssignments: Assignment[] = [
   {
     id: 'asg-01',
     class_id: 'cls-k98',
-    session_id: 'sess-02',
+    session_id: 'sess-01',
     session_number: 1,
     title: 'Quay video thực hành dáng đi Runway cơ bản',
     description: 'Học viên luyện tập 10 bước đi Runway thẳng hàng, kết hợp đánh tay tự nhiên và dừng tạo dáng (Pose) 3 giây ở cuối thảm đỏ.',
     requirements: [
       'Trang phục chỉnh tề, quần áo ôm dáng hoặc đồ tập Model Kids.',
       'Quay video góc máy ngang toàn thân, độ dài tối thiểu 45 giây đến 1 phút.',
-      'Thực hiện nụ cười rạng rỡ và ánh mắt tự tin nhìn thẳng vào ống kính máy quay.'
+      'Thực hiện nụ cười rạng rỡ và ánh mắt tự tin nhìn thẳng vào ống kính máy quay.',
     ],
-    notes: 'Hạn chót nộp bài: 23:59 ngày 30/10/2026. Phụ huynh quay và tải video lên Google Drive rồi dán link chia sẻ bên dưới.',
+    notes: 'Hạn chót nộp bài: 23:59 ngày 30/10/2026. Phụ huynh tải video lên Google Drive rồi dán link chia sẻ bên dưới.',
     due_date: '2026-10-30',
     submission_drive_url: 'https://drive.google.com/drive/folders/ta-academy-k98-homework',
-    is_unlocked: true,
+    is_unlocked: true, // Đã mở vì buổi 1 đã hoàn thành điểm danh!
     created_at: '2026-10-26T12:00:00Z',
   },
   {
     id: 'asg-02',
     class_id: 'cls-k98',
+    session_id: 'sess-02',
     session_number: 2,
-    title: 'Giải phóng hình thể và biểu cảm gương mặt',
-    description: 'Thực hành các biểu cảm: Tự tin - Vui tươi - Quyến rũ trước gương.',
-    requirements: ['Chụp 3 bức ảnh 3 sắc thái biểu cảm khác nhau'],
+    title: 'Luyện bước đi theo nhịp nhạc sôi động',
+    description: 'Bật nhạc Model Kids tại nhà và quay video sải bước 15 nhịp đúng phách nhạc.',
+    requirements: ['Quay video tối thiểu 1 phút đúng nhịp nhạc'],
+    notes: 'Bài tập sẽ tự động mở sau khi cô giáo hoàn thành điểm danh buổi 2.',
     due_date: '2026-11-04',
-    is_unlocked: false,
+    is_unlocked: false, // Khóa cho đến khi cô giáo điểm danh buổi 2 xong!
     created_at: '2026-10-26T12:00:00Z',
-  }
+  },
 ];
 
 export const initialEvaluations: StudentEvaluation[] = [
@@ -377,26 +447,58 @@ export const initialEvaluations: StudentEvaluation[] = [
     session_date: '2026-10-26',
     content: 'Thảo có tinh thần học tập rất tốt, tiếp thu nhanh các động tác giữ thẳng lưng và vai. Bước đi đã vững vàng hơn so với buổi đầu tiên. Cần tiếp tục luyện thêm động tác xoay người để mượt mà hơn.',
     evaluation_type: 'session',
-    created_by: 'p-gv-03',
+    created_by: 'Võ Ngọc Như Ý',
     created_at: '2026-10-26T11:00:00Z',
     updated_at: '2026-10-26T11:00:00Z',
-  }
+  },
 ];
 
 export const initialBenefits: StudentBenefit[] = [
   {
     id: 'ben-01',
     student_id: 'std-01',
-    student_name: 'Lê Hoàng Thu Thảo',
     student_code: 'TA-STD-998',
-    class_code: 'K98',
+    student_name: 'Lê Hoàng Thu Thảo',
     course_name: 'Model Kids',
-    total_registered_sessions: 16,
+    class_code: 'K98',
+    drive_link: 'https://drive.google.com/drive/folders/ta-model-kids-k98-thuthao',
+    status: 'in_progress',
+    overdue_days: 0,
+    completed_date: '',
+    is_milestone_17: true, // Model Kids & Catwalk có mốc video buổi 17
     completed_sessions: 1,
-    remaining_sessions: 15,
+    total_registered_sessions: 16,
     absent_sessions: 0,
-    reserved_sessions: 0,
-    expiry_date: '2027-04-30',
-    status: 'active',
-  }
+  },
+  {
+    id: 'ben-02',
+    student_id: 'std-02',
+    student_code: 'TA-STD-002',
+    student_name: 'Nguyễn Ngọc Anh Thư',
+    course_name: 'Catwalk',
+    class_code: 'C12',
+    drive_link: '',
+    status: 'overdue',
+    overdue_days: 3, // Trễ hạn 3 ngày
+    completed_date: '',
+    is_milestone_17: true,
+    completed_sessions: 17,
+    total_registered_sessions: 16,
+    absent_sessions: 1,
+  },
+  {
+    id: 'ben-03',
+    student_id: 'std-03',
+    student_code: 'TA-STD-003',
+    student_name: 'Trần Bảo Ngọc',
+    course_name: 'Phong thái',
+    class_code: 'PT01',
+    drive_link: 'https://drive.google.com/drive/folders/ta-phong-thai-pt01',
+    status: 'completed',
+    completed_date: '25/10/2026',
+    is_milestone_17: false,
+    completed_sessions: 12,
+    total_registered_sessions: 12,
+    absent_sessions: 0,
+  },
 ];

@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import Image from 'next/image';
 import {
   Sparkles,
   Calendar,
@@ -25,25 +26,29 @@ export default function HomeDashboard() {
       title: 'Phong thái',
       desc: 'Rèn luyện cốt cách, dáng đứng, dáng ngồi và sự thanh lịch chuẩn mực của phụ nữ hiện đại.',
       badge: 'Thanh lịch',
-      gradient: 'from-rose-900/90 via-red-950/80 to-black/80',
-    },
-    {
-      title: 'Model Kids',
-      desc: 'Đào tạo người mẫu nhí, giải phóng hình thể, biểu cảm và tự tin tỏa sáng trên sàn diễn.',
-      badge: 'Tự tin',
-      gradient: 'from-amber-900/90 via-red-950/80 to-black/80',
+      image: '/images/phong-thai.png',
+      tag: 'Khóa Đào Tạo',
     },
     {
       title: 'Catwalk',
       desc: 'Kỹ thuật trình diễn thời trang cao cấp, nhịp bước âm nhạc và làm chủ sàn runway chuyên nghiệp.',
       badge: 'Chuyên nghiệp',
-      gradient: 'from-red-900/90 via-rose-950/80 to-black/80',
+      image: '/images/catwalk.png',
+      tag: 'Trình Diễn',
+    },
+    {
+      title: 'Model Kids',
+      desc: 'Đào tạo người mẫu nhí, giải phóng hình thể, biểu cảm và tự tin tỏa sáng trên sân khấu thời trang.',
+      badge: 'Tự tin',
+      image: '/images/model-kids.png',
+      tag: 'Thiếu Nhi',
     },
     {
       title: 'Chương trình đào tạo',
       desc: 'Lộ trình cá nhân hóa, đào tạo bài bản từ cơ bản đến chuyên sâu cùng đội ngũ chuyên gia hàng đầu.',
       badge: 'Toàn diện',
-      gradient: 'from-stone-900/90 via-red-950/80 to-black/80',
+      image: '/images/phong-thai.png',
+      tag: 'Lộ Trình VIP',
     },
   ];
 
@@ -93,24 +98,36 @@ export default function HomeDashboard() {
         <div className="absolute right-4 -bottom-10 w-64 h-64 bg-white/10 rounded-full blur-2xl pointer-events-none"></div>
       </div>
 
-      {/* 4 Introduction Cards */}
+      {/* 4 Introduction Cards with Uploaded Real Images */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {introCards.map((card, i) => (
           <div
             key={i}
-            className="group relative rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 bg-gray-900 border border-gray-200 h-64 flex flex-col justify-end p-5"
+            className="group relative rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 bg-gray-900 border border-gray-200 h-80 flex flex-col justify-end p-5"
           >
-            {/* Background texture gradient */}
-            <div className={`absolute inset-0 bg-gradient-to-t ${card.gradient} transition-opacity`}></div>
+            {/* Background Image */}
+            <div className="absolute inset-0 z-0">
+              <img
+                src={card.image}
+                alt={card.title}
+                className="w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-500"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-black/10"></div>
+            </div>
 
             <div className="relative z-10 text-white space-y-2">
-              <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-white/20 backdrop-blur-md text-white border border-white/20 inline-block">
-                {card.badge}
-              </span>
+              <div className="flex items-center space-x-2">
+                <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-brand-500 text-white shadow-sm inline-block uppercase">
+                  {card.badge}
+                </span>
+                <span className="text-[10px] font-semibold text-gray-300">
+                  {card.tag}
+                </span>
+              </div>
               <h3 className="text-lg font-bold tracking-tight text-white group-hover:text-amber-200 transition-colors">
                 {card.title}
               </h3>
-              <p className="text-xs text-gray-200 leading-relaxed line-clamp-3">
+              <p className="text-xs text-gray-200 leading-relaxed line-clamp-2">
                 {card.desc}
               </p>
             </div>

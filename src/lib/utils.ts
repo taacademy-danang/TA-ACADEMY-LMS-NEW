@@ -103,6 +103,7 @@ export function generateSessionsForClass(
         class_code: classCode,
         class_name: className,
         course_name: courseName,
+        session_type: 'group',
         session_number: sessionCount,
         session_date: sessionDate,
         day_of_week: currentDayOfWeek,
