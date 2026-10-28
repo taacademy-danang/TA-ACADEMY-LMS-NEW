@@ -73,7 +73,7 @@ interface AppContextType {
   currentUser: Profile;
   setCurrentUser: (user: Profile) => void;
   isAuthenticated: boolean;
-  login: (username: string, pass: string) => boolean;
+  login: (username: string, pass: string, rememberMe?: boolean) => boolean;
   logout: () => void;
 
   // Data states
@@ -210,7 +210,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     // Khôi phục phiên đăng nhập nếu đã đăng nhập trước đó trên trình duyệt này
     if (typeof window !== 'undefined') {
-      const savedUserId = localStorage.getItem('ta_current_user_id');
+      const savedUserId = sessionStorage.getItem('ta_current_user_id') || localStorage.getItem('ta_current_user_id');
       if (savedUserId) {
         const found = profiles.find((p) => p.id === savedUserId);
         if (found) {
@@ -222,7 +222,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   // Auth: Đăng nhập
-  const login = (usernameInput: string, passInput: string): boolean => {
+  const login = (usernameInput: string, passInput: string, rememberMe: boolean = false): boolean => {
     const u = usernameInput.trim().toLowerCase();
     const pInput = passInput.trim();
 
@@ -245,7 +245,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setCurrentUser(found);
         setIsAuthenticated(true);
         if (typeof window !== 'undefined') {
-          localStorage.setItem('ta_current_user_id', found.id);
+          if (rememberMe) {
+            localStorage.setItem('ta_current_user_id', found.id);
+          } else {
+            sessionStorage.setItem('ta_current_user_id', found.id);
+            localStorage.removeItem('ta_current_user_id');
+          }
         }
         showToast(`Đăng nhập thành công! Chào mừng ${found.full_name} (${found.role.toUpperCase()})`);
         return true;
@@ -257,7 +262,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setCurrentUser(initialProfiles[0]);
       setIsAuthenticated(true);
       if (typeof window !== 'undefined') {
-        localStorage.setItem('ta_current_user_id', initialProfiles[0].id);
+        if (rememberMe) {
+          localStorage.setItem('ta_current_user_id', initialProfiles[0].id);
+        } else {
+          sessionStorage.setItem('ta_current_user_id', initialProfiles[0].id);
+          localStorage.removeItem('ta_current_user_id');
+        }
       }
       showToast('Đăng nhập thành công tài khoản Quản Trị Viên (Admin)');
       return true;
@@ -271,6 +281,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setIsAuthenticated(false);
     if (typeof window !== 'undefined') {
       localStorage.removeItem('ta_current_user_id');
+      sessionStorage.removeItem('ta_current_user_id');
     }
     showToast('Đã đăng xuất khỏi hệ thống', 'info');
   };

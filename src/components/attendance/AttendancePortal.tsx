@@ -18,7 +18,7 @@ import { useApp } from '@/lib/store';
 import { AttendanceStatus } from '@/types';
 
 export default function AttendancePortal() {
-  const { classes, students, sessions, attendance, saveAttendance, currentUser, showToast } =
+  const { classes, students, intakeRecords, sessions, attendance, saveAttendance, currentUser, showToast } =
     useApp();
 
   const isStudent = currentUser.role === 'student';
@@ -44,9 +44,37 @@ export default function AttendancePortal() {
   const activeClass =
     classes.find((c) => c.id === selectedClassId) || visibleClasses[0] || classes[0];
 
-  const classStudents = students.filter(
-    (s) => s.class_id === activeClass?.id || s.class_code === activeClass?.code
+  // Danh sách học viên của lớp: Bao gồm học viên chính thức VÀ học viên vừa xếp lớp từ Chờ xếp lớp
+  const officialClassStudents = students.filter(
+    (s) => s.class_id === activeClass?.id || (activeClass?.code && s.class_code === activeClass.code)
   );
+
+  const intakeClassStudents = (intakeRecords || [])
+    .filter(
+      (r) =>
+        (r.assigned_class_id === activeClass?.id || (activeClass?.code && r.assigned_class_code === activeClass.code)) &&
+        !officialClassStudents.some((s) => s.phone === r.phone || s.full_name === r.full_name)
+    )
+    .map((r, idx) => ({
+      id: r.student_code || `intake-${r.id}`,
+      full_name: r.full_name,
+      phone: r.phone,
+      student_code: r.student_code || `TA-STD-${String(idx + 1).padStart(3, '0')}`,
+      course_id: r.course_id,
+      course_name: r.course_name,
+      class_id: r.assigned_class_id || activeClass?.id,
+      class_code: r.assigned_class_code || activeClass?.code,
+      class_name: r.assigned_class_name || activeClass?.name,
+      total_registered_sessions: r.total_sessions || 16,
+      completed_sessions: 0,
+      remaining_sessions: r.total_sessions || 16,
+      absent_sessions: 0,
+      status: 'active' as const,
+      intake_date: r.created_at,
+      created_at: r.created_at,
+    }));
+
+  const classStudents = [...officialClassStudents, ...intakeClassStudents];
 
   const currentSession = sessions.find(
     (s) => s.class_id === activeClass?.id && (s.session_date === selectedDate || s.day_of_week === 3)
@@ -251,7 +279,15 @@ export default function AttendancePortal() {
                         <div className="flex items-center space-x-2 text-xs text-gray-500 mt-1 font-medium">
                           <span>GV: {cls.teacher_name}</span>
                           <span>•</span>
-                          <span>Sĩ số: {cls.student_count}</span>
+                          <span>
+                            Sĩ số:{' '}
+                            {students.filter((s) => s.class_id === cls.id || s.class_code === cls.code).length +
+                              (intakeRecords?.filter(
+                                (r) =>
+                                  (r.assigned_class_id === cls.id || r.assigned_class_code === cls.code) &&
+                                  !students.some((s) => s.phone === r.phone)
+                              )?.length || 0)}
+                          </span>
                         </div>
                       </div>
 

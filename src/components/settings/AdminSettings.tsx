@@ -162,13 +162,19 @@ export default function AdminSettings() {
 
   const handleSaveClass = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!classForm.days_of_week || classForm.days_of_week.length === 0) {
+      showToast('Vui lòng chọn ít nhất 1 thứ trong tuần cho lớp học!', 'error');
+      return;
+    }
     const course = courses.find((c) => c.id === classForm.course_id);
     const teacher = profiles.find((p) => p.id === classForm.teacher_id);
     const calculatedEndTime = calculateClassEndTime(classForm.start_time, classForm.class_type);
+    const generatedClassName = course ? `${classForm.code.trim()} – ${course.name}` : classForm.code.trim();
 
     if (editingClass) {
       editClass(editingClass.id, {
         ...classForm,
+        name: generatedClassName,
         course_name: course ? course.name : editingClass.course_name,
         teacher_name: teacher ? teacher.full_name : editingClass.teacher_name,
         end_time: calculatedEndTime,
@@ -177,6 +183,7 @@ export default function AdminSettings() {
     } else {
       addClass({
         ...classForm,
+        name: generatedClassName,
         course_name: course ? course.name : 'Chưa xác định',
         teacher_name: teacher ? teacher.full_name : 'Chưa phân công',
         end_time: calculatedEndTime,
@@ -906,36 +913,26 @@ function syncFromTAAcademy() {
             <form onSubmit={handleSaveClass} className="mt-4 space-y-3.5">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1">Mã lớp</label>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">
+                    Mã lớp <span className="text-red-500">*</span>
+                  </label>
                   <input
                     type="text"
                     required
                     placeholder="Ví dụ: K99"
                     value={classForm.code}
                     onChange={(e) => setClassForm({ ...classForm, code: e.target.value })}
-                    className="w-full px-3 py-2 text-xs bg-gray-50 border border-gray-200 rounded-xl"
+                    className="w-full px-3 py-2 text-xs bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 font-bold"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1">Tên lớp học</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="Ví dụ: K99 – MODEL KIDS"
-                    value={classForm.name}
-                    onChange={(e) => setClassForm({ ...classForm, name: e.target.value })}
-                    className="w-full px-3 py-2 text-xs bg-gray-50 border border-gray-200 rounded-xl"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1">Khóa học</label>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">
+                    Khóa học <span className="text-red-500">*</span>
+                  </label>
                   <select
                     value={classForm.course_id}
                     onChange={(e) => setClassForm({ ...classForm, course_id: e.target.value })}
-                    className="w-full px-3 py-2 text-xs bg-gray-50 border border-gray-200 rounded-xl"
+                    className="w-full px-3 py-2 text-xs bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 font-semibold"
                   >
                     {courses.map((c) => (
                       <option key={c.id} value={c.id}>
@@ -944,7 +941,51 @@ function syncFromTAAcademy() {
                     ))}
                   </select>
                 </div>
+              </div>
 
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1.5">
+                  Lịch học các thứ trong tuần <span className="text-red-500">*</span>
+                </label>
+                <div className="grid grid-cols-4 sm:grid-cols-7 gap-1.5">
+                  {[
+                    { id: 1, label: 'Thứ 2' },
+                    { id: 2, label: 'Thứ 3' },
+                    { id: 3, label: 'Thứ 4' },
+                    { id: 4, label: 'Thứ 5' },
+                    { id: 5, label: 'Thứ 6' },
+                    { id: 6, label: 'Thứ 7' },
+                    { id: 7, label: 'Chủ nhật' },
+                  ].map((d) => {
+                    const isSelected = classForm.days_of_week?.includes(d.id);
+                    return (
+                      <button
+                        type="button"
+                        key={d.id}
+                        onClick={() => {
+                          const current = classForm.days_of_week || [];
+                          const next = isSelected
+                            ? current.filter((x) => x !== d.id)
+                            : [...current, d.id].sort((a, b) => a - b);
+                          setClassForm({ ...classForm, days_of_week: next });
+                        }}
+                        className={`py-2 px-2 rounded-xl text-xs font-bold transition-all border text-center ${
+                          isSelected
+                            ? 'bg-brand-500 text-white border-brand-500 shadow-sm shadow-red-200'
+                            : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
+                        }`}
+                      >
+                        {isSelected ? `✓ ${d.label}` : d.label}
+                      </button>
+                    );
+                  })}
+                </div>
+                {(!classForm.days_of_week || classForm.days_of_week.length === 0) && (
+                  <p className="text-[11px] text-red-500 mt-1 font-medium">Vui lòng chọn ít nhất 1 thứ trong tuần</p>
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-gray-700 mb-1">Giáo viên phụ trách</label>
                   <select
@@ -961,9 +1002,6 @@ function syncFromTAAcademy() {
                       ))}
                   </select>
                 </div>
-              </div>
-
-              <div className="grid grid-cols-3 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-gray-700 mb-1">Loại hình</label>
                   <select
@@ -976,6 +1014,19 @@ function syncFromTAAcademy() {
                     <option value="group">Lớp nhóm (1h30)</option>
                     <option value="one_on_one">Lớp kèm (1h)</option>
                   </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">Ngày bắt đầu</label>
+                  <input
+                    type="date"
+                    required
+                    value={classForm.start_date}
+                    onChange={(e) => setClassForm({ ...classForm, start_date: e.target.value })}
+                    className="w-full px-3 py-2 text-xs bg-gray-50 border border-gray-200 rounded-xl"
+                  />
                 </div>
 
                 <div>
@@ -1001,17 +1052,6 @@ function syncFromTAAcademy() {
                     className="w-full px-3 py-2 text-xs bg-gray-50 border border-gray-200 rounded-xl"
                   />
                 </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">Ngày bắt đầu</label>
-                <input
-                  type="date"
-                  required
-                  value={classForm.start_date}
-                  onChange={(e) => setClassForm({ ...classForm, start_date: e.target.value })}
-                  className="w-full px-3 py-2 text-xs bg-gray-50 border border-gray-200 rounded-xl"
-                />
               </div>
 
               <div className="pt-3 flex justify-end space-x-2 border-t border-gray-100">

@@ -8,16 +8,11 @@ export default function LoginScreen() {
   const { login } = useApp();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [rememberMe, setRememberMe] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    login(username, password);
-  };
-
-  const handleQuickLogin = (u: string, p: string = '123456') => {
-    setUsername(u);
-    setPassword(p);
-    login(u, p);
+    login(username, password, rememberMe);
   };
 
   return (
@@ -45,7 +40,7 @@ export default function LoginScreen() {
                 required
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                placeholder="Username hoặc Số điện thoại"
+                placeholder="Username, Số điện thoại hoặc Mã học viên"
                 className="w-full pl-10 pr-4 py-2.5 text-xs bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 font-medium"
               />
             </div>
@@ -60,57 +55,41 @@ export default function LoginScreen() {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="Mật khẩu"
+                placeholder="Nhập mật khẩu"
                 className="w-full pl-10 pr-4 py-2.5 text-xs bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 font-medium"
               />
             </div>
           </div>
 
+          {/* Checkbox: Lưu phiên đăng nhập */}
+          <div className="flex items-center justify-between pt-1">
+            <label className="flex items-center space-x-2 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+                className="w-4 h-4 rounded text-brand-500 focus:ring-brand-500 border-gray-300 accent-brand-500 cursor-pointer"
+              />
+              <span className="text-xs text-gray-700 font-medium">Lưu phiên đăng nhập</span>
+            </label>
+          </div>
+
           <button
             type="submit"
-            className="w-full py-3 bg-brand-500 hover:bg-brand-600 text-white text-xs font-bold rounded-xl shadow-lg shadow-red-200 transition-all hover:scale-[1.01] flex items-center justify-center space-x-2"
+            className="w-full py-3 bg-brand-500 hover:bg-brand-600 text-white text-xs font-bold rounded-xl shadow-lg shadow-red-200 transition-all hover:scale-[1.01] flex items-center justify-center space-x-2 mt-2"
           >
             <span>Đăng Nhập Vào Hệ Thống</span>
             <ArrowRight className="w-4 h-4" />
           </button>
         </form>
 
-        {/* Quick Login Shortcut Boxes for Demo */}
-        <div className="pt-4 border-t border-gray-100 space-y-2.5">
-          <div className="text-[11px] font-bold text-gray-400 uppercase text-center">
-            Đăng nhập nhanh theo vai trò:
-          </div>
-
-          <div className="grid grid-cols-3 gap-2 text-xs">
-            <button
-              type="button"
-              onClick={() => handleQuickLogin('admin', '123456')}
-              className="p-2.5 rounded-xl border border-red-200 bg-red-50/60 hover:bg-red-100 text-left transition-colors"
-            >
-              <div className="font-extrabold text-brand-500">Admin</div>
-              <div className="text-[10px] text-gray-500">Toàn quyền hệ thống</div>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleQuickLogin('khauthinga', '123456')}
-              className="p-2.5 rounded-xl border border-blue-200 bg-blue-50/60 hover:bg-blue-100 text-left transition-colors"
-            >
-              <div className="font-extrabold text-blue-800">Cô Nga (GV)</div>
-              <div className="text-[10px] text-gray-500">Quyền chờ xếp lớp</div>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleQuickLogin('vongocnhuy', '123456')}
-              className="p-2.5 rounded-xl border border-purple-200 bg-purple-50/60 hover:bg-purple-100 text-left transition-colors"
-            >
-              <div className="font-extrabold text-purple-800">Cô Như Ý (GV)</div>
-              <div className="text-[10px] text-gray-500">Giáo viên đào tạo</div>
-            </button>
-          </div>
-          <p className="text-[10px] text-gray-500 text-center mt-2 font-medium">
-            Học viên đăng nhập bằng Số điện thoại hoặc Mã học viên (Mật khẩu khởi tạo: <span className="font-bold text-brand-500">123456</span>)
+        {/* Note footer */}
+        <div className="pt-3 border-t border-gray-100 text-center">
+          <p className="text-[11px] text-gray-500 font-medium">
+            Học viên đăng nhập bằng <span className="font-semibold text-gray-700">Số điện thoại</span> hoặc <span className="font-semibold text-gray-700">Mã học viên</span>
+          </p>
+          <p className="text-[10px] text-gray-400 mt-1">
+            Mật khẩu mặc định khởi tạo: <span className="font-bold text-brand-500">123456</span>
           </p>
         </div>
       </div>

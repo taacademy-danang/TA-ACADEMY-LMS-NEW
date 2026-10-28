@@ -356,11 +356,21 @@ export default function ScheduleManager() {
                       {daysOfWeekHeader.map((d) => {
                         const matchedSessions = filteredSessions.filter((s) => {
                           const sHour = parseInt(s.start_time.split(':')[0], 10);
-                          return (
-                            (s.session_date === d.fullDate || s.day_of_week === d.dayIndex) &&
-                            sHour === hour
-                          );
+                          if (s.session_date) {
+                            return s.session_date === d.fullDate && sHour === hour;
+                          }
+                          return s.day_of_week === d.dayIndex && sHour === hour;
                         });
+
+                        // Lọc duy nhất, mỗi lớp chỉ xuất hiện đúng 1 ô trên 1 khung giờ
+                        const uniqueSessions = Array.from(
+                          new Map(
+                            matchedSessions.map((item) => [
+                              `${item.class_id || item.class_code || item.class_name}-${item.start_time}`,
+                              item,
+                            ])
+                          ).values()
+                        );
 
                         return (
                           <td
@@ -370,7 +380,7 @@ export default function ScheduleManager() {
                             }`}
                           >
                             <div className="space-y-2">
-                              {matchedSessions.map((session) => (
+                              {uniqueSessions.map((session) => (
                                 <div
                                   key={session.id}
                                   className={`p-3 rounded-xl border hover:shadow-md transition-all group relative ${
