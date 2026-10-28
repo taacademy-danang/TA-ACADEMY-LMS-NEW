@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import {
   Profile,
   Course,
@@ -31,6 +31,36 @@ import {
   initialSubmissions,
 } from './initialData';
 import { generateStudentCode, generateSessionsForClass } from './utils';
+import { isSupabaseConfigured } from './supabase';
+import {
+  fetchAllDataFromSupabase,
+  dbAddCourse,
+  dbUpdateCourse,
+  dbDeleteCourse,
+  dbAddClass,
+  dbUpdateClass,
+  dbDeleteClass,
+  dbAddIntake,
+  dbUpdateIntake,
+  dbDeleteIntake,
+  dbAddStudent,
+  dbAddProfile,
+  dbUpdateProfile,
+  dbDeleteProfile,
+  dbAddSession,
+  dbUpdateSession,
+  dbDeleteSession,
+  dbSaveAttendance,
+  dbAddLessonPlan,
+  dbUpdateLessonPlan,
+  dbDeleteLessonPlan,
+  dbBatchImportLessonPlans,
+  dbSaveEvaluation,
+  dbSubmitHomework,
+  dbSaveHomeworkFeedback,
+  dbAddBenefit,
+  dbUpdateBenefit,
+} from './supabaseService';
 
 interface Toast {
   id: string;
@@ -114,6 +144,9 @@ interface AppContextType {
   editCourse: (id: string, course: Partial<Course>) => void;
   deleteCourse: (id: string) => void;
 
+  // Supabase Status
+  isSupabaseConfigured: boolean;
+
   // Notification
   toasts: Toast[];
   showToast: (message: string, type?: 'success' | 'error' | 'info') => void;
@@ -152,6 +185,29 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const dismissToast = (id: string) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   };
+
+  // Đồng bộ toàn bộ dữ liệu từ Supabase PostgreSQL khi khởi động
+  useEffect(() => {
+    if (isSupabaseConfigured) {
+      fetchAllDataFromSupabase().then((data) => {
+        if (data) {
+          if (data.profiles && data.profiles.length > 0) setProfiles(data.profiles);
+          if (data.courses && data.courses.length > 0) setCourses(data.courses);
+          if (data.classes) setClasses(data.classes);
+          if (data.intakeRecords) setIntakeRecords(data.intakeRecords);
+          if (data.students) setStudents(data.students);
+          if (data.sessions) setSessions(data.sessions);
+          if (data.attendance) setAttendance(data.attendance);
+          if (data.lessonPlans) setLessonPlans(data.lessonPlans);
+          if (data.assignments) setAssignments(data.assignments);
+          if (data.submissions) setSubmissions(data.submissions);
+          if (data.evaluations) setEvaluations(data.evaluations);
+          if (data.benefits) setBenefits(data.benefits);
+          showToast('Đã kết nối và đồng bộ dữ liệu thời gian thực từ Supabase!', 'success');
+        }
+      });
+    }
+  }, []);
 
   // Auth: Đăng nhập
   const login = (usernameInput: string, passInput: string): boolean => {
@@ -202,26 +258,31 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     };
 
     setIntakeRecords((prev) => [newRecord, ...prev]);
+    dbAddIntake(newRecord);
     showToast(`Đã tiếp nhận hồ sơ học viên ${data.full_name} vào danh sách chờ xếp lớp!`);
   };
 
   const editIntakeRecord = (id: string, data: { full_name: string; phone: string; course_id: string; total_sessions: number }) => {
     const course = courses.find((c) => c.id === data.course_id);
+    const updated = {
+      full_name: data.full_name,
+      phone: data.phone,
+      course_id: data.course_id,
+      course_name: course ? course.name : 'Chưa xác định',
+      total_sessions: data.total_sessions,
+      updated_at: new Date().toISOString(),
+    };
     setIntakeRecords((prev) =>
       prev.map((item) =>
         item.id === id
           ? {
               ...item,
-              full_name: data.full_name,
-              phone: data.phone,
-              course_id: data.course_id,
-              course_name: course ? course.name : item.course_name,
-              total_sessions: data.total_sessions,
-              updated_at: new Date().toISOString(),
+              ...updated,
             }
           : item
       )
     );
+    dbUpdateIntake(id, updated);
     showToast('Đã cập nhật thông tin học viên thành công!');
   };
 
@@ -232,22 +293,27 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
+    const updatedData = {
+      status: 'assigned_class' as const,
+      assigned_class_id: targetClass.id,
+      assigned_class_code: targetClass.code,
+      assigned_class_name: targetClass.name,
+      assigned_teacher_name: targetClass.teacher_name,
+      updated_at: new Date().toISOString(),
+    };
+
     setIntakeRecords((prev) =>
       prev.map((item) => {
         if (item.id === intakeId) {
           return {
             ...item,
-            status: 'assigned_class',
-            assigned_class_id: targetClass.id,
-            assigned_class_code: targetClass.code,
-            assigned_class_name: targetClass.name,
-            assigned_teacher_name: targetClass.teacher_name,
-            updated_at: new Date().toISOString(),
+            ...updatedData,
           };
         }
         return item;
       })
     );
+    dbUpdateIntake(intakeId, updatedData);
     showToast(`Đã xếp lớp ${targetClass.code} thành công! Hồ sơ chuyển sang bước Cấp tài khoản.`);
   };
 
@@ -329,6 +395,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setStudents((prev) => [...prev, newStudent]);
     setBenefits((prev) => [...prev, newBenefit]);
 
+    // Lưu vào Supabase Database
+    dbAddProfile(newProfile);
+    dbAddStudent(newStudent);
+    dbAddBenefit(newBenefit);
+    dbDeleteIntake(intakeId);
+
     showToast(`Đã cấp tài khoản thành công cho học viên ${intake.full_name} (${studentCode})! Học viên đã hoàn tất và được chuyển vào danh sách lớp.`);
     return { username, tempPass, studentCode };
   };
@@ -359,17 +431,24 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     setClasses((prev) => [newClass, ...prev]);
     setSessions((prev) => [...prev, ...generatedSessions]);
+
+    // Lưu vào Supabase
+    dbAddClass(newClass);
+    generatedSessions.forEach((s) => dbAddSession(s));
+
     showToast(`Đã tạo lớp ${newClass.code} và tự động sinh ${generatedSessions.length} buổi học trên Thời khóa biểu!`);
   };
 
   const editClass = (id: string, data: Partial<ClassItem>) => {
     setClasses((prev) => prev.map((c) => (c.id === id ? { ...c, ...data } : c)));
+    dbUpdateClass(id, data);
     showToast('Đã cập nhật thông tin lớp học thành công!');
   };
 
   const deleteClass = (id: string) => {
     setClasses((prev) => prev.filter((c) => c.id !== id));
     setSessions((prev) => prev.filter((s) => s.class_id !== id));
+    dbDeleteClass(id);
     showToast('Đã xóa lớp học và lịch học tương ứng', 'info');
   };
 
@@ -380,16 +459,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       status: 'scheduled',
     };
     setSessions((prev) => [...prev, newSession]);
+    dbAddSession(newSession);
     showToast(`Đã thêm lịch dạy ${sessionData.session_type === 'private' ? 'kèm 1-1' : 'lớp nhóm'} thành công!`);
   };
 
   const editSession = (id: string, updatedData: Partial<ClassSession>) => {
     setSessions((prev) => prev.map((s) => (s.id === id ? { ...s, ...updatedData } : s)));
+    dbUpdateSession(id, updatedData);
     showToast('Đã cập nhật thông tin buổi học thành công!');
   };
 
   const deleteSession = (sessionId: string) => {
     setSessions((prev) => prev.filter((s) => s.id !== sessionId));
+    dbDeleteSession(sessionId);
     showToast('Đã xóa buổi học khỏi thời khóa biểu (lớp nghỉ)', 'info');
   };
 
@@ -402,22 +484,25 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       prev.map((s) => (s.id === sessionId ? { ...s, status: 'completed' } : s))
     );
 
+    const newAttendanceList: AttendanceRecord[] = records.map((item) => ({
+      id: `att-${sessionId}-${item.student_id}`,
+      session_id: sessionId,
+      class_id: classId,
+      student_id: item.student_id,
+      student_name: item.student_name,
+      student_code: item.student_code,
+      status: item.status,
+      notes: item.notes,
+      marked_at: new Date().toISOString(),
+      marked_by: currentUser.id,
+    }));
+
     setAttendance((prev) => {
       const filtered = prev.filter((r) => r.session_id !== sessionId);
-      const newRecords: AttendanceRecord[] = records.map((item) => ({
-        id: `att-${sessionId}-${item.student_id}`,
-        session_id: sessionId,
-        class_id: classId,
-        student_id: item.student_id,
-        student_name: item.student_name,
-        student_code: item.student_code,
-        status: item.status,
-        notes: item.notes,
-        marked_at: new Date().toISOString(),
-        marked_by: currentUser.id,
-      }));
-      return [...filtered, ...newRecords];
+      return [...filtered, ...newAttendanceList];
     });
+
+    dbSaveAttendance(newAttendanceList);
 
     records.forEach((rec) => {
       if (rec.status === 'present') {
@@ -492,6 +577,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       return prev;
     });
 
+    // Cập nhật trạng thái buổi học vào Supabase
+    dbUpdateSession(sessionId, { status: 'completed' });
+
     showToast('Đã lưu dữ liệu điểm danh và mở khóa bài tập buổi học này!');
   };
 
@@ -517,6 +605,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         updated_at: new Date().toISOString(),
       };
       setEvaluations((prev) => [newEval, ...prev]);
+      dbSaveEvaluation(newEval);
       showToast('Đã lưu nhận xét đánh giá học viên thành công!');
     }
   };
@@ -532,13 +621,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       status: 'submitted',
     };
     setSubmissions((prev) => [newSub, ...prev.filter((s) => s.assignment_id !== assignmentId || s.student_id !== studentId)]);
+    dbSubmitHomework(newSub);
     showToast('Đã nộp link bài tập thành công!');
   };
 
   const saveHomeworkFeedback = (assignmentId: string, studentId: string, feedback: string) => {
+    let subId = '';
     setSubmissions((prev) => {
       const existing = prev.find((s) => s.assignment_id === assignmentId && s.student_id === studentId);
       if (existing) {
+        subId = existing.id;
         return prev.map((s) =>
           s.id === existing.id
             ? { ...s, teacher_feedback: feedback, status: 'reviewed', reviewed_at: new Date().toISOString() }
@@ -557,8 +649,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         teacher_feedback: feedback,
         reviewed_at: new Date().toISOString(),
       };
+      subId = newSub.id;
       return [newSub, ...prev];
     });
+    if (subId) {
+      dbSaveHomeworkFeedback(subId, feedback);
+    }
     showToast('Đã lưu nhận xét bài tập thành công!');
   };
 
@@ -566,6 +662,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setBenefits((prev) =>
       prev.map((b) => (b.id === id ? { ...b, ...data } : b))
     );
+    dbUpdateBenefit(id, data);
     showToast('Đã cập nhật quyền lợi & link Drive cho học viên!');
   };
 
@@ -575,16 +672,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       id: `lp-${Date.now()}`,
     };
     setLessonPlans((prev) => [...prev, newPlan]);
+    dbAddLessonPlan(newPlan);
     showToast(`Đã thêm buổi học ${newPlan.session_number}: ${newPlan.title} vào giáo án!`);
   };
 
   const editLessonPlan = (id: string, data: Partial<LessonPlan>) => {
     setLessonPlans((prev) => prev.map((lp) => (lp.id === id ? { ...lp, ...data } : lp)));
+    dbUpdateLessonPlan(id, data);
     showToast('Đã cập nhật nội dung giáo án và bài tập về nhà!');
   };
 
   const deleteLessonPlan = (id: string) => {
     setLessonPlans((prev) => prev.filter((p) => p.id !== id));
+    dbDeleteLessonPlan(id);
     showToast('Đã xóa buổi học khỏi giáo án!');
   };
 
@@ -611,20 +711,24 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       return [...remaining, ...newPlans];
     });
 
+    dbBatchImportLessonPlans(courseId, newPlans, overwrite);
     showToast(`Đã tải lên và lưu ${newPlans.length} buổi học cho khóa ${courseName}!`);
   };
 
   const toggleLockUser = (userId: string) => {
+    let nextStatus: 'active' | 'locked' = 'active';
     setProfiles((prev) =>
       prev.map((p) => {
         if (p.id === userId) {
           const newStatus = p.status === 'locked' ? 'active' : 'locked';
+          nextStatus = newStatus;
           showToast(`Đã ${newStatus === 'locked' ? 'khóa' : 'mở khóa'} tài khoản ${p.full_name}`);
           return { ...p, status: newStatus };
         }
         return p;
       })
     );
+    dbUpdateProfile(userId, { status: nextStatus });
   };
 
   const resetUserPassword = (userId: string): string => {
@@ -635,6 +739,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const deleteUser = (userId: string) => {
     setProfiles((prev) => prev.filter((p) => p.id !== userId));
+    dbDeleteProfile(userId);
     showToast('Đã xóa tài khoản khỏi hệ thống', 'info');
   };
 
@@ -651,6 +756,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       updated_at: new Date().toISOString(),
     };
     setProfiles((prev) => [...prev, newProfile]);
+    dbAddProfile(newProfile);
     showToast(`Đã cấp tài khoản mới cho ${data.full_name}!`);
   };
 
@@ -661,16 +767,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       created_at: new Date().toISOString(),
     };
     setCourses((prev) => [...prev, newCourse]);
+    dbAddCourse(newCourse);
     showToast(`Đã tạo khóa học ${newCourse.name} thành công!`);
   };
 
   const editCourse = (id: string, courseData: Partial<Course>) => {
     setCourses((prev) => prev.map((c) => (c.id === id ? { ...c, ...courseData } : c)));
+    dbUpdateCourse(id, courseData);
     showToast('Đã cập nhật thông tin khóa học thành công!');
   };
 
   const deleteCourse = (id: string) => {
     setCourses((prev) => prev.filter((c) => c.id !== id));
+    dbDeleteCourse(id);
     showToast('Đã xóa khóa học', 'info');
   };
 
@@ -720,6 +829,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         addCourse,
         editCourse,
         deleteCourse,
+        isSupabaseConfigured,
         toasts,
         showToast,
         dismissToast,
