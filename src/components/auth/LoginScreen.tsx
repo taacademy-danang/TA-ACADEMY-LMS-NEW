@@ -6,8 +6,8 @@ import { useApp } from '@/lib/store';
 
 export default function LoginScreen() {
   const { login } = useApp();
-  const [username, setUsername] = useState('admin');
-  const [password, setPassword] = useState('123456');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
