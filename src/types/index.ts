@@ -4,6 +4,7 @@ export interface Profile {
   id: string;
   email: string;
   username?: string;
+  password?: string;
   full_name: string;
   role: UserRole;
   phone: string;

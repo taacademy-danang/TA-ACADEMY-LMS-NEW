@@ -109,8 +109,8 @@ export default function LoginScreen() {
               <div className="text-[10px] text-gray-500">Giáo viên đào tạo</div>
             </button>
           </div>
-          <p className="text-[10px] text-gray-400 text-center mt-2">
-            Học viên đăng nhập bằng Số điện thoại và mật khẩu được cấp từ hệ thống
+          <p className="text-[10px] text-gray-500 text-center mt-2 font-medium">
+            Học viên đăng nhập bằng Số điện thoại hoặc Mã học viên (Mật khẩu khởi tạo: <span className="font-bold text-brand-500">123456</span>)
           </p>
         </div>
       </div>

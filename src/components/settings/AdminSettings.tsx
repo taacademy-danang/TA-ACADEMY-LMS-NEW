@@ -407,7 +407,7 @@ function syncFromTAAcademy() {
                           <span className="font-semibold text-gray-800">{p.username || p.phone}</span>
                           <span className="text-gray-400">/</span>
                           <span className="text-gray-500 font-mono">
-                            {isPassVisible ? '123456' : '••••••••'}
+                            {isPassVisible ? (p.password || '123456') : '••••••••'}
                           </span>
                           <button
                             onClick={() => togglePasswordVisibility(p.id)}

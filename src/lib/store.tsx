@@ -224,25 +224,36 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // Auth: Đăng nhập
   const login = (usernameInput: string, passInput: string): boolean => {
     const u = usernameInput.trim().toLowerCase();
+    const pInput = passInput.trim();
+
     const found = profiles.find(
       (p) =>
         (p.username && p.username.toLowerCase() === u) ||
         p.phone === u ||
-        p.email.toLowerCase() === u
+        p.email.toLowerCase() === u ||
+        (p.student_code && p.student_code.toLowerCase() === u)
     );
 
-    if (found && (passInput === '123456' || passInput === 'admin')) {
-      setCurrentUser(found);
-      setIsAuthenticated(true);
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('ta_current_user_id', found.id);
+    if (found) {
+      if (found.status === 'locked') {
+        showToast('Tài khoản này hiện đang bị khóa. Vui lòng liên hệ Admin!', 'error');
+        return false;
       }
-      showToast(`Đăng nhập thành công! Chào mừng ${found.full_name} (${found.role.toUpperCase()})`);
-      return true;
+
+      const validPass = found.password || '123456';
+      if (pInput === validPass || (found.role === 'admin' && (pInput === 'admin' || pInput === '123456'))) {
+        setCurrentUser(found);
+        setIsAuthenticated(true);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('ta_current_user_id', found.id);
+        }
+        showToast(`Đăng nhập thành công! Chào mừng ${found.full_name} (${found.role.toUpperCase()})`);
+        return true;
+      }
     }
 
     // Cho phép admin mặc định
-    if (u === 'admin' && (passInput === '123456' || passInput === 'admin')) {
+    if (u === 'admin' && (pInput === '123456' || pInput === 'admin')) {
       setCurrentUser(initialProfiles[0]);
       setIsAuthenticated(true);
       if (typeof window !== 'undefined') {
@@ -348,12 +359,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     const studentCode = generateStudentCode(students.length);
     const username = intake.phone;
-    const tempPass = Math.floor(100000 + Math.random() * 900000).toString();
+    const tempPass = '123456';
 
     const newProfile: Profile = {
       id: `p-${Date.now()}`,
       email: `${username}@ta.edu.vn`,
       username: username,
+      password: tempPass,
       full_name: intake.full_name,
       role: 'student',
       phone: intake.phone,
@@ -753,8 +765,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const resetUserPassword = (userId: string): string => {
-    const newPass = Math.floor(100000 + Math.random() * 900000).toString();
-    showToast(`Mật khẩu mới đã được đặt lại: ${newPass}`);
+    const newPass = '123456';
+    setProfiles((prev) => prev.map((p) => (p.id === userId ? { ...p, password: newPass } : p)));
+    dbUpdateProfile(userId, { password: newPass });
+    showToast(`Mật khẩu đã được đặt lại thành: ${newPass}`);
     return newPass;
   };
 
@@ -764,11 +778,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     showToast('Đã xóa tài khoản khỏi hệ thống', 'info');
   };
 
-  const createNewAccount = (data: { full_name: string; username: string; role: 'admin' | 'teacher' | 'student'; phone: string; email: string }) => {
+  const createNewAccount = (data: { full_name: string; username: string; role: 'admin' | 'teacher' | 'student'; phone: string; email: string; password?: string }) => {
+    const pass = data.password || '123456';
     const newProfile: Profile = {
       id: `p-${Date.now()}`,
       email: data.email,
       username: data.username,
+      password: pass,
       full_name: data.full_name,
       role: data.role,
       phone: data.phone,
@@ -778,7 +794,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     };
     setProfiles((prev) => [...prev, newProfile]);
     dbAddProfile(newProfile);
-    showToast(`Đã cấp tài khoản mới cho ${data.full_name}!`);
+    showToast(`Đã cấp tài khoản mới cho ${data.full_name}! (Mật khẩu: ${pass})`);
   };
 
   const addCourse = (courseData: Omit<Course, 'id' | 'created_at'>) => {

@@ -372,7 +372,7 @@ export default function IntakePipeline() {
                             studentName: item.full_name,
                             studentCode: item.student_code || 'TA-STD-998',
                             username: item.account_username || item.phone,
-                            tempPass: '••••••••',
+                            tempPass: '123456',
                             className: item.assigned_class_name || 'Lớp đào tạo T.A',
                           })
                         }
