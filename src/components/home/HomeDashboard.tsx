@@ -1,18 +1,13 @@
 'use client';
 
 import React from 'react';
-import Image from 'next/image';
 import {
   Sparkles,
   Calendar,
-  Award,
-  Users,
   Compass,
   Heart,
+  Users,
   ChevronRight,
-  ExternalLink,
-  BookOpen,
-  Star,
 } from 'lucide-react';
 import { useApp } from '@/lib/store';
 
@@ -27,28 +22,24 @@ export default function HomeDashboard() {
       desc: 'Rèn luyện cốt cách, dáng đứng, dáng ngồi và sự thanh lịch chuẩn mực của phụ nữ hiện đại.',
       badge: 'Thanh lịch',
       image: '/images/phong-thai.png',
-      tag: 'Khóa Đào Tạo',
     },
     {
       title: 'Catwalk',
       desc: 'Kỹ thuật trình diễn thời trang cao cấp, nhịp bước âm nhạc và làm chủ sàn runway chuyên nghiệp.',
       badge: 'Chuyên nghiệp',
       image: '/images/catwalk.png',
-      tag: 'Trình Diễn',
     },
     {
       title: 'Model Kids',
       desc: 'Đào tạo người mẫu nhí, giải phóng hình thể, biểu cảm và tự tin tỏa sáng trên sân khấu thời trang.',
       badge: 'Tự tin',
       image: '/images/model-kids.png',
-      tag: 'Thiếu Nhi',
     },
     {
-      title: 'Chương trình đào tạo',
-      desc: 'Lộ trình cá nhân hóa, đào tạo bài bản từ cơ bản đến chuyên sâu cùng đội ngũ chuyên gia hàng đầu.',
-      badge: 'Toàn diện',
-      image: '/images/phong-thai.png',
-      tag: 'Lộ Trình VIP',
+      title: 'Đào tạo doanh nghiệp',
+      desc: 'Chuẩn hóa tác phong chuyên nghiệp, nghi thức giao tiếp và xây dựng hình ảnh đại diện thương hiệu uy tín.',
+      badge: 'Doanh nghiệp',
+      image: '/images/dao-tao-doanh-nghiep.png',
     },
   ];
 
@@ -85,8 +76,9 @@ export default function HomeDashboard() {
           <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
             Xin chào, {currentUser.full_name}
           </h1>
+          {/* Cập nhật câu chào đúng yêu cầu */}
           <p className="mt-1 text-sm text-red-100 font-medium">
-            Chúc bạn một ngày làm việc tràn đầy năng lượng và hiệu quả tại T.A Academy!
+            Chúc bạn một ngày học tập hiệu quả!
           </p>
           <div className="mt-4 flex items-center space-x-2 text-xs text-red-200">
             <Calendar className="w-4 h-4" />
@@ -94,34 +86,31 @@ export default function HomeDashboard() {
           </div>
         </div>
 
-        {/* Decorative elements */}
         <div className="absolute right-4 -bottom-10 w-64 h-64 bg-white/10 rounded-full blur-2xl pointer-events-none"></div>
       </div>
 
-      {/* 4 Introduction Cards with Uploaded Real Images */}
+      {/* 4 Introduction Cards: Di chuyển ảnh lên trên để thấy toàn bộ nhân vật & bỏ các chữ màu xám */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {introCards.map((card, i) => (
           <div
             key={i}
-            className="group relative rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 bg-gray-900 border border-gray-200 h-80 flex flex-col justify-end p-5"
+            className="group relative rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 bg-gray-900 border border-gray-200 h-96 flex flex-col justify-end p-5"
           >
-            {/* Background Image */}
+            {/* Ảnh đưa lên cao (object-top) để thấy toàn bộ khuôn mặt và vóc dáng nhân vật */}
             <div className="absolute inset-0 z-0">
               <img
                 src={card.image}
                 alt={card.title}
                 className="w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-500"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-black/10"></div>
+              {/* Lớp phủ chuyển sắc nhẹ ở đáy để làm nổi bật chữ mà không che người */}
+              <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent"></div>
             </div>
 
             <div className="relative z-10 text-white space-y-2">
-              <div className="flex items-center space-x-2">
+              <div>
                 <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-brand-500 text-white shadow-sm inline-block uppercase">
                   {card.badge}
-                </span>
-                <span className="text-[10px] font-semibold text-gray-300">
-                  {card.tag}
                 </span>
               </div>
               <h3 className="text-lg font-bold tracking-tight text-white group-hover:text-amber-200 transition-colors">
@@ -150,8 +139,9 @@ export default function HomeDashboard() {
             </button>
           </div>
 
-          <p className="text-xs text-gray-600 leading-relaxed">
-            T.A Academy là học viện tiên phong chuẩn hóa chương trình đào tạo phong thái, catwalk và nghệ thuật sân khấu tại Việt Nam. Chúng tôi cam kết đồng hành cùng từng học viên để xây dựng sự tự tin, cốt cách thanh lịch và bản lĩnh tỏa sáng trước đám đông.
+          {/* Nội dung chuẩn theo yêu cầu chính xác của người dùng */}
+          <p className="text-xs text-gray-700 leading-relaxed font-medium">
+            Về T.A Academy là học viện tiên phong chuẩn hóa chương trình đào tạo phong thái, catwalk và sự tự tin đầu tiên tại Đà Nẵng. Chúng tôi cam kết đồng hành cùng từng học viên để xây dựng sự tự tin, sự thanh lịch và bản lĩnh tỏa sáng trước đám đông.
           </p>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -181,7 +171,7 @@ export default function HomeDashboard() {
               </div>
               <h4 className="font-extrabold text-xs text-gray-900">Đối tượng</h4>
               <p className="text-[11px] text-gray-600 leading-relaxed">
-                Trẻ em Model Kids, nữ giới, thanh thiếu niên và người yêu nghệ thuật.
+                Trẻ em Model Kids, nữ giới, thanh thiếu niên và doanh nghiệp tại Đà Nẵng.
               </p>
             </div>
           </div>
@@ -191,7 +181,7 @@ export default function HomeDashboard() {
         <div className="lg:col-span-5 bg-white rounded-2xl border border-gray-200 p-6 shadow-sm space-y-4">
           <div className="flex items-center justify-between pb-3 border-b border-gray-100">
             <h2 className="text-lg font-extrabold text-gray-900">Thông tin & Hoạt động</h2>
-            <span className="text-xs font-bold text-gray-400">Tháng 10/2026</span>
+            <span className="text-xs font-bold text-gray-400">Đà Nẵng • 2026</span>
           </div>
 
           <div className="space-y-3">

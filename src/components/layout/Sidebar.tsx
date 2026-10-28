@@ -12,6 +12,7 @@ import {
   FileText,
   Settings,
 } from 'lucide-react';
+import { useApp } from '@/lib/store';
 
 export type TabId =
   | 'home'
@@ -30,17 +31,71 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ activeTab, onTabChange }: SidebarProps) {
-  const navItems: { id: TabId; label: string; icon: React.ReactNode }[] = [
-    { id: 'home', label: 'TRANG CHỦ', icon: <Home className="w-5 h-5" /> },
-    { id: 'intake', label: 'CHỜ XẾP LỚP', icon: <UserPlus className="w-5 h-5" /> },
-    { id: 'schedule', label: 'THỜI KHÓA BIỂU', icon: <Calendar className="w-5 h-5" /> },
-    { id: 'attendance', label: 'ĐIỂM DANH', icon: <CheckSquare className="w-5 h-5" /> },
-    { id: 'assignments', label: 'BÀI TẬP', icon: <BookOpen className="w-5 h-5" /> },
-    { id: 'evaluations', label: 'ĐÁNH GIÁ', icon: <Award className="w-5 h-5" /> },
-    { id: 'benefits', label: 'QUYỀN LỢI', icon: <Gift className="w-5 h-5" /> },
-    { id: 'curriculum', label: 'GIÁO ÁN', icon: <FileText className="w-5 h-5" /> },
-    { id: 'settings', label: 'CÀI ĐẶT', icon: <Settings className="w-5 h-5" /> },
+  const { currentUser } = useApp();
+
+  // Kiểm tra quyền theo vai trò
+  const isAdmin = currentUser.role === 'admin';
+  const isTeacher = currentUser.role === 'teacher';
+  const isStudent = currentUser.role === 'student';
+
+  // "Riêng giáo viên Nga có thể thấy được tab chờ xếp lớp và tham gia chỉnh sửa được"
+  const isTeacherNga =
+    isTeacher &&
+    (currentUser.username === 'khauthinga' || currentUser.full_name.includes('Nga'));
+
+  const navItems: { id: TabId; label: string; icon: React.ReactNode; show: boolean }[] = [
+    { id: 'home', label: 'TRANG CHỦ', icon: <Home className="w-5 h-5" />, show: true },
+    {
+      id: 'intake',
+      label: 'CHỜ XẾP LỚP',
+      icon: <UserPlus className="w-5 h-5" />,
+      show: isAdmin || isTeacherNga, // Chỉ Admin và cô Nga
+    },
+    {
+      id: 'schedule',
+      label: 'THỜI KHÓA BIỂU',
+      icon: <Calendar className="w-5 h-5" />,
+      show: isAdmin || isTeacher,
+    },
+    {
+      id: 'attendance',
+      label: 'ĐIỂM DANH',
+      icon: <CheckSquare className="w-5 h-5" />,
+      show: true, // Học viên được xem
+    },
+    {
+      id: 'assignments',
+      label: 'BÀI TẬP',
+      icon: <BookOpen className="w-5 h-5" />,
+      show: true, // Học viên được nộp link
+    },
+    {
+      id: 'evaluations',
+      label: 'ĐÁNH GIÁ',
+      icon: <Award className="w-5 h-5" />,
+      show: true, // Học viên được xem
+    },
+    {
+      id: 'benefits',
+      label: 'QUYỀN LỢI',
+      icon: <Gift className="w-5 h-5" />,
+      show: true, // Học viên được xem
+    },
+    {
+      id: 'curriculum',
+      label: 'GIÁO ÁN',
+      icon: <FileText className="w-5 h-5" />,
+      show: isAdmin || isTeacher,
+    },
+    {
+      id: 'settings',
+      label: 'CÀI ĐẶT',
+      icon: <Settings className="w-5 h-5" />,
+      show: isAdmin, // Chỉ Admin
+    },
   ];
+
+  const visibleItems = navItems.filter((i) => i.show);
 
   return (
     <aside className="w-64 bg-white border-r border-gray-200 flex flex-col h-screen sticky top-0 shrink-0">
@@ -57,7 +112,7 @@ export default function Sidebar({ activeTab, onTabChange }: SidebarProps) {
 
       {/* Navigation tabs */}
       <nav className="p-4 space-y-1.5 flex-1 overflow-y-auto">
-        {navItems.map((item) => {
+        {visibleItems.map((item) => {
           const isActive = activeTab === item.id;
           return (
             <button

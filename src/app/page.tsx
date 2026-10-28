@@ -12,11 +12,17 @@ import AdminSettings from '@/components/settings/AdminSettings';
 import StudentPortal from '@/components/student/StudentPortal';
 import BenefitsManager from '@/components/benefits/BenefitsManager';
 import CurriculumManager from '@/components/curriculum/CurriculumManager';
+import LoginScreen from '@/components/auth/LoginScreen';
 import { useApp } from '@/lib/store';
 
 export default function AppMainPage() {
-  const [activeTab, setActiveTab] = useState<TabId>('intake'); // Mặc định mở Tab Chờ Xếp Lớp (Giao diện 1)
-  const { currentUser } = useApp();
+  const [activeTab, setActiveTab] = useState<TabId>('home');
+  const { currentUser, isAuthenticated } = useApp();
+
+  // Nếu chưa đăng nhập, hiển thị màn hình đăng nhập chuyên nghiệp
+  if (!isAuthenticated) {
+    return <LoginScreen />;
+  }
 
   return (
     <div className="flex min-h-screen bg-[#F7F7F8]">
@@ -41,7 +47,7 @@ export default function AppMainPage() {
           {activeTab === 'settings' && <AdminSettings />}
         </main>
 
-        {/* Footer bám sát chân trang ở Ảnh tham chiếu 1 */}
+        {/* Footer bám sát chân trang */}
         <footer className="mt-auto py-5 px-8 border-t border-gray-200/80 bg-white/50 flex flex-col sm:flex-row items-center justify-between text-xs text-gray-500 gap-2">
           <div className="font-semibold text-gray-700">
             T.A Academy — Học viện Đào tạo Phong thái

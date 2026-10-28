@@ -38,9 +38,12 @@ interface Toast {
 }
 
 interface AppContextType {
-  // Current user
+  // Auth state
   currentUser: Profile;
   setCurrentUser: (user: Profile) => void;
+  isAuthenticated: boolean;
+  login: (username: string, pass: string) => boolean;
+  logout: () => void;
 
   // Data states
   profiles: Profile[];
@@ -110,7 +113,9 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
-  const [currentUser, setCurrentUser] = useState<Profile>(initialProfiles[0]); // Default to Admin
+  const [currentUser, setCurrentUser] = useState<Profile>(initialProfiles[0]); // Ban Giám Đốc T.A
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(true); // Có thể logout ra màn hình đăng nhập
+
   const [profiles, setProfiles] = useState<Profile[]>(initialProfiles);
   const [courses, setCourses] = useState<Course[]>(initialCourses);
   const [classes, setClasses] = useState<ClassItem[]>(initialClasses);
@@ -138,6 +143,40 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   };
 
+  // Auth: Đăng nhập
+  const login = (usernameInput: string, passInput: string): boolean => {
+    const u = usernameInput.trim().toLowerCase();
+    const found = profiles.find(
+      (p) =>
+        (p.username && p.username.toLowerCase() === u) ||
+        p.phone === u ||
+        p.email.toLowerCase() === u
+    );
+
+    if (found && (passInput === '123456' || passInput === 'admin')) {
+      setCurrentUser(found);
+      setIsAuthenticated(true);
+      showToast(`Đăng nhập thành công! Chào mừng ${found.full_name} (${found.role.toUpperCase()})`);
+      return true;
+    }
+
+    // Cho phép admin mặc định
+    if (u === 'admin' && (passInput === '123456' || passInput === 'admin')) {
+      setCurrentUser(initialProfiles[0]);
+      setIsAuthenticated(true);
+      showToast('Đăng nhập thành công tài khoản Quản Trị Viên (Admin)');
+      return true;
+    }
+
+    showToast('Tên đăng nhập hoặc mật khẩu không chính xác (Mặc định: 123456)', 'error');
+    return false;
+  };
+
+  const logout = () => {
+    setIsAuthenticated(false);
+    showToast('Đã đăng xuất khỏi hệ thống', 'info');
+  };
+
   // 1. Tiếp nhận học viên mới
   const addIntakeRecord = (data: { full_name: string; phone: string; course_id: string; total_sessions: number }) => {
     const course = courses.find((c) => c.id === data.course_id);
@@ -156,7 +195,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     showToast(`Đã tiếp nhận hồ sơ học viên ${data.full_name} vào danh sách chờ xếp lớp!`);
   };
 
-  // Sửa hồ sơ học viên
   const editIntakeRecord = (id: string, data: { full_name: string; phone: string; course_id: string; total_sessions: number }) => {
     const course = courses.find((c) => c.id === data.course_id);
     setIntakeRecords((prev) =>
@@ -177,7 +215,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     showToast('Đã cập nhật thông tin học viên thành công!');
   };
 
-  // 2. Xếp lớp cho hồ sơ
   const assignClassToIntake = (intakeId: string, classId: string) => {
     const targetClass = classes.find((c) => c.id === classId);
     if (!targetClass) {
@@ -204,7 +241,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     showToast(`Đã xếp lớp ${targetClass.code} thành công! Hồ sơ chuyển sang bước Cấp tài khoản.`);
   };
 
-  // 3. Cấp tài khoản và hoàn tất đồng bộ toàn hệ thống
+  // Cấp tài khoản: Học viên nào đã cấp tài khoản rồi thì không hiện thông tin trong tab chờ xếp lớp nữa
   const generateAccountForIntake = (intakeId: string) => {
     const intake = intakeRecords.find((r) => r.id === intakeId);
     if (!intake) {
@@ -216,7 +253,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const username = intake.phone;
     const tempPass = Math.floor(100000 + Math.random() * 900000).toString();
 
-    // 1. Tạo profile
     const newProfile: Profile = {
       id: `p-${Date.now()}`,
       email: `${username}@ta.edu.vn`,
@@ -230,7 +266,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       updated_at: new Date().toISOString(),
     };
 
-    // 2. Tạo student
     const newStudent: Student = {
       id: `std-${Date.now()}`,
       profile_id: newProfile.id,
@@ -251,7 +286,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       created_at: new Date().toISOString(),
     };
 
-    // 3. Tăng sĩ số lớp
     if (intake.assigned_class_id) {
       setClasses((prev) =>
         prev.map((c) =>
@@ -260,7 +294,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       );
     }
 
-    // 4. Tạo quyền lợi học viên (cột mốc buổi 17 cho Model Kids/Catwalk)
     const isMilestone = intake.course_name.includes('Model Kids') || intake.course_name.includes('Catwalk');
     const newBenefit: StudentBenefit = {
       id: `ben-${Date.now()}`,
@@ -279,29 +312,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       completed_date: '',
     };
 
-    // Cập nhật trạng thái intake
-    setIntakeRecords((prev) =>
-      prev.map((item) =>
-        item.id === intakeId
-          ? {
-              ...item,
-              status: 'account_created',
-              student_code: studentCode,
-              account_username: username,
-            }
-          : item
-      )
-    );
+    // Đánh dấu completed và xóa học viên khỏi phễu chờ xếp lớp theo đúng yêu cầu!
+    setIntakeRecords((prev) => prev.filter((item) => item.id !== intakeId));
 
     setProfiles((prev) => [...prev, newProfile]);
     setStudents((prev) => [...prev, newStudent]);
     setBenefits((prev) => [...prev, newBenefit]);
 
-    showToast(`Đã cấp tài khoản thành công cho học viên ${intake.full_name} (${studentCode})!`);
+    showToast(`Đã cấp tài khoản thành công cho học viên ${intake.full_name} (${studentCode})! Học viên đã hoàn tất và được chuyển vào danh sách lớp.`);
     return { username, tempPass, studentCode };
   };
 
-  // 4. Thêm lớp mới và tự động sinh lịch học
   const addClass = (newClassData: Omit<ClassItem, 'id' | 'student_count' | 'created_at'>) => {
     const classId = `cls-${Date.now()}`;
     const newClass: ClassItem = {
@@ -342,7 +363,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     showToast('Đã xóa lớp học và lịch học tương ứng', 'info');
   };
 
-  // Thêm buổi học thủ công (GROUP hoặc PRIVATE)
   const addSession = (sessionData: Omit<ClassSession, 'id' | 'status'>) => {
     const newSession: ClassSession = {
       ...sessionData,
@@ -353,7 +373,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     showToast(`Đã thêm lịch dạy ${sessionData.session_type === 'private' ? 'kèm 1-1' : 'lớp nhóm'} thành công!`);
   };
 
-  // Chỉnh sửa buổi học (thay đổi giờ, đổi cô giáo dạy thay...)
   const editSession = (id: string, updatedData: Partial<ClassSession>) => {
     setSessions((prev) => prev.map((s) => (s.id === id ? { ...s, ...updatedData } : s)));
     showToast('Đã cập nhật thông tin buổi học thành công!');
@@ -364,17 +383,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     showToast('Đã xóa buổi học khỏi thời khóa biểu (lớp nghỉ)', 'info');
   };
 
-  // 5. Lưu điểm danh theo NGUYÊN TẮC:
-  // - Có mặt: tính buổi học (+1 completed_sessions)
-  // - Vắng: không tính buổi học, nhưng hiện bên buổi vắng (+1 absent_sessions)
-  // - Không điểm danh: không tính
-  // - Khi điểm danh xong buổi nào -> mở khóa bài tập buổi đó từ giáo án!
   const saveAttendance = (
     sessionId: string,
     classId: string,
     records: { student_id: string; student_name: string; student_code: string; status: AttendanceStatus; notes?: string }[]
   ) => {
-    // Đánh dấu session này đã hoàn thành điểm danh
     setSessions((prev) =>
       prev.map((s) => (s.id === sessionId ? { ...s, status: 'completed' } : s))
     );
@@ -396,7 +409,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       return [...filtered, ...newRecords];
     });
 
-    // Cập nhật số buổi hoàn thành / vắng
     records.forEach((rec) => {
       if (rec.status === 'present') {
         setStudents((prev) =>
@@ -439,7 +451,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
     });
 
-    // Tự động mở khóa bài tập tương ứng cho buổi học vừa điểm danh xong!
     const targetSession = sessions.find((s) => s.id === sessionId);
     const sessionNum = targetSession ? targetSession.session_number : 1;
     const plan = lessonPlans.find((lp) => lp.session_number === sessionNum);
@@ -463,7 +474,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           due_date: new Date(Date.now() + plan.homework_due_days * 24 * 60 * 60 * 1000)
             .toISOString()
             .split('T')[0],
-          is_unlocked: true, // MỞ KHÓA TỨC THÌ
+          is_unlocked: true,
           created_at: new Date().toISOString(),
         };
         return [...prev, newAsg];
@@ -474,7 +485,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     showToast('Đã lưu dữ liệu điểm danh và mở khóa bài tập buổi học này!');
   };
 
-  // 6. Lưu đánh giá học viên
   const saveEvaluation = (data: Omit<StudentEvaluation, 'id' | 'created_at' | 'updated_at'>) => {
     const existingIndex = evaluations.findIndex(
       (e) => e.student_id === data.student_id && e.session_date === data.session_date
@@ -501,7 +511,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // 7. Nộp bài tập học viên
   const submitHomework = (assignmentId: string, studentId: string, studentName: string, link: string) => {
     const newSub: AssignmentSubmission = {
       id: `sub-${Date.now()}`,
@@ -516,7 +525,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     showToast('Đã nộp link bài tập thành công!');
   };
 
-  // 8. Cập nhật quyền lợi học viên (gắn link Drive, tình trạng...)
   const updateBenefit = (id: string, data: { drive_link?: string; status?: 'completed' | 'in_progress' | 'overdue'; completed_date?: string }) => {
     setBenefits((prev) =>
       prev.map((b) => (b.id === id ? { ...b, ...data } : b))
@@ -524,13 +532,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     showToast('Đã cập nhật quyền lợi & link Drive cho học viên!');
   };
 
-  // 9. Chỉnh sửa giáo án
   const editLessonPlan = (id: string, data: Partial<LessonPlan>) => {
     setLessonPlans((prev) => prev.map((lp) => (lp.id === id ? { ...lp, ...data } : lp)));
     showToast('Đã cập nhật nội dung giáo án và bài tập về nhà!');
   };
 
-  // 10. Quản lý tài khoản
   const toggleLockUser = (userId: string) => {
     setProfiles((prev) =>
       prev.map((p) => {
@@ -596,6 +602,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       value={{
         currentUser,
         setCurrentUser,
+        isAuthenticated,
+        login,
+        logout,
         profiles,
         courses,
         classes,

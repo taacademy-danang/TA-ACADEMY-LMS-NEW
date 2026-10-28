@@ -20,24 +20,43 @@ import { useApp } from '@/lib/store';
 import { Student } from '@/types';
 
 export default function StudentEvaluationManager() {
-  const { students, evaluations, sessions, saveEvaluation, currentUser, showToast } = useApp();
+  const { students, evaluations, sessions, classes, saveEvaluation, currentUser, showToast } =
+    useApp();
 
-  // Bộ lọc theo ngày để chỉ hiển thị học viên học buổi đó trong ngày đã chọn
+  const isStudent = currentUser.role === 'student';
+  const isTeacher = currentUser.role === 'teacher';
+
   const [filterDate, setFilterDate] = useState('2026-10-26');
   const [subTab, setSubTab] = useState<'session' | 'general' | 'history'>('session');
   const [content, setContent] = useState('');
 
+  // Nếu là giáo viên, chỉ lấy các lớp do giáo viên này dạy
+  const teacherClasses = classes.filter(
+    (c) =>
+      !isTeacher ||
+      c.teacher_id === currentUser.id ||
+      c.teacher_name === currentUser.full_name ||
+      c.teacher_name.includes(currentUser.full_name)
+  );
+  const teacherClassCodes = teacherClasses.map((c) => c.code);
+
   // Tìm các buổi học diễn ra vào ngày filterDate
-  const sessionsOnDate = sessions.filter((s) => s.session_date === filterDate);
+  const sessionsOnDate = sessions.filter(
+    (s) =>
+      s.session_date === filterDate &&
+      (!isTeacher || s.teacher_id === currentUser.id || s.teacher_name === currentUser.full_name)
+  );
   const activeClassCodesOnDate = sessionsOnDate.map((s) => s.class_code);
   const activeClassIdsOnDate = sessionsOnDate.map((s) => s.class_id);
 
-  // Chỉ lọc những học viên học buổi đó trong ngày được chọn
-  const studentsOnDate = students.filter(
-    (st) =>
+  // Chỉ lọc những học viên học buổi đó trong ngày được chọn và thuộc lớp của cô giáo
+  const studentsOnDate = students.filter((st) => {
+    if (isTeacher && !teacherClassCodes.includes(st.class_code || '')) return false;
+    return (
       activeClassCodesOnDate.includes(st.class_code) ||
       (st.class_id && activeClassIdsOnDate.includes(st.class_id))
-  );
+    );
+  });
 
   const [selectedStudentId, setSelectedStudentId] = useState<string>(
     studentsOnDate[0]?.id || students[0]?.id || ''
@@ -62,6 +81,11 @@ export default function StudentEvaluationManager() {
   }, [selectedStudentId, filterDate, evaluations, activeStudent]);
 
   const handleSave = () => {
+    if (isStudent) {
+      showToast('Học viên chỉ có quyền xem nhận xét đánh giá', 'error');
+      return;
+    }
+
     if (!content.trim()) {
       showToast('Vui lòng nhập nội dung đánh giá trước khi lưu', 'error');
       return;
@@ -86,23 +110,77 @@ export default function StudentEvaluationManager() {
     setContent((prev) => `${prev} ${openTag}nội dung${closeTag} `);
   };
 
+  // NẾU LÀ HỌC VIÊN: Hiển thị giao diện xem đánh giá cá nhân (Read-only)
+  if (isStudent) {
+    const myStudent =
+      students.find(
+        (s) => s.phone === currentUser.phone || s.profile_id === currentUser.id
+      ) || students[0];
+    const myEvals = evaluations.filter(
+      (e) => e.student_id === myStudent?.id || e.student_name === myStudent?.full_name
+    );
+
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight">
+            Đánh Giá & Nhận Xét Của Giáo Viên
+          </h1>
+          <p className="text-sm text-gray-500 mt-0.5">
+            Xem những nhận xét chi tiết sau mỗi buổi học từ cô giáo phụ trách của bạn
+          </p>
+        </div>
+
+        <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+            <h3 className="font-extrabold text-sm text-gray-900">
+              Học viên: {myStudent?.full_name} ({myStudent?.class_code})
+            </h3>
+            <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+              {myEvals.length} nhận xét
+            </span>
+          </div>
+
+          <div className="space-y-3">
+            {myEvals.length === 0 ? (
+              <div className="text-center py-10 text-xs text-gray-400">
+                Chưa có nhận xét nào từ giáo viên.
+              </div>
+            ) : (
+              myEvals.map((ev) => (
+                <div key={ev.id} className="p-4 rounded-xl border border-gray-200 bg-gray-50/50 space-y-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-bold text-brand-500">Buổi học ngày: {ev.session_date}</span>
+                    <span className="text-gray-500 text-[11px] font-semibold">
+                      Cô giáo nhận xét: {ev.created_by}
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-700 whitespace-pre-wrap leading-relaxed">{ev.content}</p>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // GIAO DIỆN GIÁO VIÊN & ADMIN
   return (
     <div className="space-y-6">
-      {/* 2-Panel Layout: Bám sát ảnh tham chiếu số 4 */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Panel Trái — Danh sách học viên có bộ lọc theo ngày */}
         <div className="lg:col-span-4 bg-white rounded-2xl border border-gray-200 p-5 shadow-sm space-y-4">
           <div className="flex items-center justify-between pb-3 border-b border-gray-100">
             <div className="flex items-center space-x-2 text-sm font-bold text-gray-900">
               <Users className="w-4 h-4 text-brand-500" />
-              <span>Danh sách học viên</span>
+              <span>{isTeacher ? 'Học viên lớp bạn dạy' : 'Danh sách học viên'}</span>
             </div>
             <span className="text-xs px-2.5 py-0.5 rounded-full font-bold bg-red-50 text-brand-500 border border-red-100">
               {studentsOnDate.length} học viên
             </span>
           </div>
 
-          {/* BỘ LỌC THEO NGÀY THEO YÊU CẦU */}
           <div className="p-3 bg-gray-50 rounded-xl border border-gray-200 space-y-1.5">
             <div className="flex items-center space-x-1.5 text-xs font-bold text-gray-700">
               <Calendar className="w-3.5 h-3.5 text-brand-500" />
@@ -111,9 +189,7 @@ export default function StudentEvaluationManager() {
             <input
               type="date"
               value={filterDate}
-              onChange={(e) => {
-                setFilterDate(e.target.value);
-              }}
+              onChange={(e) => setFilterDate(e.target.value)}
               className="w-full px-3 py-1.5 text-xs font-bold bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500/20"
             />
             <p className="text-[10px] text-gray-500 font-medium">

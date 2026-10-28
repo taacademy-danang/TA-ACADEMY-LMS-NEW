@@ -86,9 +86,8 @@ export default function IntakePipeline() {
   });
 
   const pendingList = filteredRecords.filter((r) => r.status === 'pending_class');
-  const assignedList = filteredRecords.filter(
-    (r) => r.status === 'assigned_class' || r.status === 'account_created'
-  );
+  // Học viên nào đã cấp tài khoản rồi thì không hiện thông tin trong tab chờ xếp lớp nữa
+  const assignedList = filteredRecords.filter((r) => r.status === 'assigned_class');
 
   const handleCreateIntake = (e: React.FormEvent) => {
     e.preventDefault();

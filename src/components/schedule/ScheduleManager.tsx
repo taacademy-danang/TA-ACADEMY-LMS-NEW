@@ -26,8 +26,18 @@ export default function ScheduleManager() {
 
   const [viewMode, setViewMode] = useState<'week' | 'day' | 'list'>('week');
   const [selectedClass, setSelectedClass] = useState<string>('all');
-  const [selectedTeacher, setSelectedTeacher] = useState<string>('all');
+  const [selectedTeacher, setSelectedTeacher] = useState<string>(
+    currentUser.role === 'teacher' ? currentUser.full_name : 'all'
+  );
   const [searchQuery, setSearchQuery] = useState('');
+
+  React.useEffect(() => {
+    if (currentUser.role === 'teacher') {
+      setSelectedTeacher(currentUser.full_name);
+    } else {
+      setSelectedTeacher('all');
+    }
+  }, [currentUser]);
 
   // Modals
   const [showAddModal, setShowAddModal] = useState(false);
