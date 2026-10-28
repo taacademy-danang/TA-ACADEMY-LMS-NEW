@@ -30,7 +30,7 @@ import {
   initialLessonPlans,
   initialSubmissions,
 } from './initialData';
-import { generateStudentCode, generateSessionsForClass } from './utils';
+import { generateStudentCode, generateUniquePassword, generateSessionsForClass } from './utils';
 import { isSupabaseConfigured } from './supabase';
 import {
   fetchAllDataFromSupabase,
@@ -44,6 +44,7 @@ import {
   dbUpdateIntake,
   dbDeleteIntake,
   dbAddStudent,
+  dbDeleteStudentCompletely,
   dbAddProfile,
   dbUpdateProfile,
   dbDeleteProfile,
@@ -137,7 +138,8 @@ interface AppContextType {
   toggleLockUser: (userId: string) => void;
   resetUserPassword: (userId: string) => string;
   deleteUser: (userId: string) => void;
-  createNewAccount: (data: { full_name: string; username: string; role: 'admin' | 'teacher' | 'student'; phone: string; email: string }) => void;
+  deleteStudent: (studentId: string) => void;
+  createNewAccount: (data: { full_name: string; username: string; role: 'admin' | 'teacher' | 'student'; phone: string; email: string; password?: string }) => void;
 
   // Course management
   addCourse: (course: Omit<Course, 'id' | 'created_at'>) => void;
@@ -375,13 +377,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       return { username: '', tempPass: '', studentCode: '' };
     }
 
-    const studentCode = generateStudentCode(students.length);
-    const username = intake.phone;
-    const tempPass = '123456';
+    const allExistingCodes = [
+      ...students.map((s) => s.student_code),
+      ...profiles.map((p) => p.student_code || ''),
+    ].filter(Boolean);
+    const studentCode = generateStudentCode(allExistingCodes);
+    const username = studentCode; // TÀI KHOẢN LÀ MÃ HỌC VIÊN
+    const tempPass = generateUniquePassword(profiles.map((p) => p.password)); // MẬT KHẨU ĐỘC NHẤT
 
     const newProfile: Profile = {
       id: `p-${Date.now()}`,
-      email: `${username}@ta.edu.vn`,
+      email: `${studentCode.toLowerCase()}@ta.edu.vn`,
       username: username,
       password: tempPass,
       full_name: intake.full_name,
@@ -840,36 +846,96 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const resetUserPassword = (userId: string): string => {
-    const newPass = '123456';
+    const existingPasses = profiles.map((p) => p.password);
+    const newPass = generateUniquePassword(existingPasses);
     setProfiles((prev) => prev.map((p) => (p.id === userId ? { ...p, password: newPass } : p)));
     dbUpdateProfile(userId, { password: newPass });
-    showToast(`Mật khẩu đã được đặt lại thành: ${newPass}`);
+    showToast(`Mật khẩu đã được đặt lại thành công: ${newPass}`);
     return newPass;
   };
 
+  const deleteStudent = (studentId: string) => {
+    // 1. Tìm thông tin học viên trong state
+    const student = students.find(
+      (s) => s.id === studentId || s.student_code === studentId || s.profile_id === studentId
+    );
+    const sId = student?.id || studentId;
+    const sCode = student?.student_code || '';
+    const profileId =
+      student?.profile_id ||
+      profiles.find((p) => (sCode && p.student_code === sCode) || p.id === studentId)?.id;
+
+    // 2. Giảm sĩ số lớp nếu học viên đang theo học một lớp
+    if (student?.class_id) {
+      setClasses((prev) =>
+        prev.map((c) =>
+          c.id === student.class_id ? { ...c, student_count: Math.max(0, c.student_count - 1) } : c
+        )
+      );
+    }
+
+    // 3. Xóa dữ liệu học viên khỏi toàn bộ local state
+    setStudents((prev) => prev.filter((s) => s.id !== sId && (!sCode || s.student_code !== sCode)));
+    setBenefits((prev) => prev.filter((b) => b.student_id !== sId && (!sCode || b.student_code !== sCode)));
+    setAttendance((prev) => prev.filter((a) => a.student_id !== sId && (!sCode || a.student_code !== sCode)));
+    setSubmissions((prev) => prev.filter((sub) => sub.student_id !== sId));
+    setEvaluations((prev) => prev.filter((ev) => ev.student_id !== sId));
+    if (profileId || sCode) {
+      setProfiles((prev) =>
+        prev.filter((p) => (profileId ? p.id !== profileId : true) && (sCode ? p.student_code !== sCode : true))
+      );
+    }
+
+    // 4. Xóa đồng bộ triệt để trên tất cả các bảng Supabase
+    dbDeleteStudentCompletely(sId, sCode, profileId);
+
+    showToast(`Đã xóa hoàn toàn dữ liệu của học viên ${student?.full_name || sCode || sId} khỏi toàn bộ hệ thống!`, 'info');
+  };
+
   const deleteUser = (userId: string) => {
-    setProfiles((prev) => prev.filter((p) => p.id !== userId));
-    dbDeleteProfile(userId);
-    showToast('Đã xóa tài khoản khỏi hệ thống', 'info');
+    const profile = profiles.find((p) => p.id === userId);
+    const isStudent =
+      profile?.role === 'student' ||
+      !!profile?.student_code ||
+      students.some((s) => s.profile_id === userId || (profile?.student_code && s.student_code === profile.student_code));
+
+    if (isStudent) {
+      const student = students.find(
+        (s) => s.profile_id === userId || (profile?.student_code && s.student_code === profile.student_code)
+      );
+      deleteStudent(student?.id || userId);
+    } else {
+      setProfiles((prev) => prev.filter((p) => p.id !== userId));
+      dbDeleteProfile(userId);
+      showToast('Đã xóa tài khoản khỏi hệ thống', 'info');
+    }
   };
 
   const createNewAccount = (data: { full_name: string; username: string; role: 'admin' | 'teacher' | 'student'; phone: string; email: string; password?: string }) => {
-    const pass = data.password || '123456';
+    const allExistingCodes = [
+      ...students.map((s) => s.student_code),
+      ...profiles.map((p) => p.student_code || ''),
+    ].filter(Boolean);
+    const studentCode = data.role === 'student' ? generateStudentCode(allExistingCodes) : undefined;
+    const finalUsername = data.role === 'student' ? (data.username || studentCode || `hv_${Date.now()}`) : data.username;
+    const pass = data.password || generateUniquePassword(profiles.map((p) => p.password));
+
     const newProfile: Profile = {
       id: `p-${Date.now()}`,
-      email: data.email,
-      username: data.username,
+      email: data.email || (data.role === 'student' ? `${finalUsername.toLowerCase()}@ta.edu.vn` : `${finalUsername}@ta.edu.vn`),
+      username: finalUsername,
       password: pass,
       full_name: data.full_name,
       role: data.role,
       phone: data.phone,
+      student_code: studentCode,
       status: 'active',
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
     setProfiles((prev) => [...prev, newProfile]);
     dbAddProfile(newProfile);
-    showToast(`Đã cấp tài khoản mới cho ${data.full_name}! (Mật khẩu: ${pass})`);
+    showToast(`Đã cấp tài khoản mới cho ${data.full_name}! (Tài khoản: ${finalUsername}, Mật khẩu: ${pass})`);
   };
 
   const addCourse = (courseData: Omit<Course, 'id' | 'created_at'>) => {
@@ -937,6 +1003,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         toggleLockUser,
         resetUserPassword,
         deleteUser,
+        deleteStudent,
         createNewAccount,
         addCourse,
         editCourse,

@@ -152,7 +152,7 @@ export default function IntakePipeline() {
   };
 
   const handleCopyCredentials = () => {
-    const text = `🎉 CHÀO MỪNG BẠN ĐẾN VỚI T.A ACADEMY\n\nHọc viên: ${credentialsModal.studentName}\nMã học viên: ${credentialsModal.studentCode}\nLớp học: ${credentialsModal.className}\nTên đăng nhập: ${credentialsModal.username}\nMật khẩu khởi tạo: ${credentialsModal.tempPass}\n\nĐăng nhập hệ thống học tập tại: ${window.location.origin}`;
+    const text = `🎉 CHÀO MỪNG BẠN ĐẾN VỚI T.A ACADEMY\n\nHọc viên: ${credentialsModal.studentName}\nMã học viên: ${credentialsModal.studentCode}\nLớp học: ${credentialsModal.className}\nTài khoản đăng nhập (Mã HV): ${credentialsModal.studentCode}\nMật khẩu: ${credentialsModal.tempPass}\n\nĐăng nhập hệ thống học tập tại: ${window.location.origin}`;
     navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2500);
@@ -726,8 +726,8 @@ export default function IntakePipeline() {
                 <span className="font-semibold text-gray-800 font-sans">{credentialsModal.className}</span>
               </div>
               <div className="flex justify-between py-1 border-b border-gray-200">
-                <span className="text-gray-500 font-sans font-medium">Tên đăng nhập (SĐT):</span>
-                <span className="font-bold text-blue-700">{credentialsModal.username}</span>
+                <span className="text-gray-500 font-sans font-medium">Tài khoản đăng nhập (Mã HV):</span>
+                <span className="font-bold text-blue-700">{credentialsModal.studentCode || credentialsModal.username}</span>
               </div>
               <div className="flex justify-between py-1">
                 <span className="text-gray-500 font-sans font-medium">Mật khẩu khởi tạo:</span>

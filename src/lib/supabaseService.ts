@@ -149,6 +149,42 @@ export async function dbDeleteProfile(id: string) {
   await supabase.from('profiles').delete().eq('id', id);
 }
 
+export async function dbDeleteStudentCompletely(studentId: string, studentCode?: string, profileId?: string) {
+  if (!isSupabaseConfigured || !supabase) return;
+  // 1. Xóa trong students
+  await supabase.from('students').delete().eq('id', studentId);
+  if (studentCode) {
+    await supabase.from('students').delete().eq('student_code', studentCode);
+  }
+
+  // 2. Xóa trong profiles
+  if (profileId) {
+    await supabase.from('profiles').delete().eq('id', profileId);
+  }
+  if (studentCode) {
+    await supabase.from('profiles').delete().eq('student_code', studentCode);
+    await supabase.from('profiles').delete().eq('username', studentCode);
+  }
+
+  // 3. Xóa trong student_benefits
+  await supabase.from('student_benefits').delete().eq('student_id', studentId);
+  if (studentCode) {
+    await supabase.from('student_benefits').delete().eq('student_code', studentCode);
+  }
+
+  // 4. Xóa trong attendance_records
+  await supabase.from('attendance_records').delete().eq('student_id', studentId);
+  if (studentCode) {
+    await supabase.from('attendance_records').delete().eq('student_code', studentCode);
+  }
+
+  // 5. Xóa trong assignment_submissions
+  await supabase.from('assignment_submissions').delete().eq('student_id', studentId);
+
+  // 6. Xóa trong student_evaluations
+  await supabase.from('student_evaluations').delete().eq('student_id', studentId);
+}
+
 // ==========================================
 // THAO TÁC THỜI KHÓA BIỂU (SESSIONS)
 // ==========================================

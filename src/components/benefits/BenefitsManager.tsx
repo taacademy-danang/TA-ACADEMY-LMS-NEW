@@ -12,12 +12,13 @@ import {
   Edit2,
   X,
   Link as LinkIcon,
+  Trash2,
 } from 'lucide-react';
 import { useApp } from '@/lib/store';
 import { StudentBenefit } from '@/types';
 
 export default function BenefitsManager() {
-  const { benefits, classes, students, updateBenefit, currentUser, showToast } = useApp();
+  const { benefits, classes, students, updateBenefit, deleteStudent, currentUser, showToast } = useApp();
 
   const isStudent = currentUser.role === 'student';
   const isTeacher = currentUser.role === 'teacher';
@@ -234,13 +235,32 @@ export default function BenefitsManager() {
 
                       {!isStudent && (
                         <td className="py-3.5 px-4 text-right">
-                          <button
-                            onClick={() => handleOpenEdit(b)}
-                            className="inline-flex items-center space-x-1 px-3 py-1.5 text-xs font-bold text-gray-700 hover:text-brand-500 hover:bg-red-50 border border-gray-200 hover:border-red-200 rounded-lg transition-colors"
-                          >
-                            <Edit2 className="w-3.5 h-3.5" />
-                            <span>Gắn Link Drive</span>
-                          </button>
+                          <div className="flex items-center justify-end space-x-2">
+                            <button
+                              onClick={() => handleOpenEdit(b)}
+                              className="inline-flex items-center space-x-1 px-3 py-1.5 text-xs font-bold text-gray-700 hover:text-brand-500 hover:bg-red-50 border border-gray-200 hover:border-red-200 rounded-lg transition-colors"
+                            >
+                              <Edit2 className="w-3.5 h-3.5" />
+                              <span>Gắn Link Drive</span>
+                            </button>
+
+                            <button
+                              onClick={() => {
+                                if (
+                                  window.confirm(
+                                    `Bạn có chắc chắn muốn xóa toàn bộ thông tin học viên "${b.student_name}" (${b.student_code})? Dữ liệu lớp học, điểm danh, nộp bài, nhận xét và quyền lợi sẽ được xóa triệt để khỏi hệ thống.`
+                                  )
+                                ) {
+                                  deleteStudent(b.student_id);
+                                }
+                              }}
+                              className="inline-flex items-center space-x-1 px-2.5 py-1.5 text-xs font-bold text-red-600 hover:text-red-700 hover:bg-red-50 border border-red-200 rounded-lg transition-colors"
+                              title="Xóa toàn bộ dữ liệu học viên"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                              <span>Xóa HV</span>
+                            </button>
+                          </div>
                         </td>
                       )}
                     </tr>

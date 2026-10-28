@@ -478,7 +478,11 @@ function syncFromTAAcademy() {
                           </button>
 
                           <button
-                            onClick={() => deleteUser(p.id)}
+                            onClick={() => {
+                              if (window.confirm(`Bạn có chắc chắn muốn xóa tài khoản "${p.full_name}" (${p.username})? Toàn bộ dữ liệu liên quan (lớp học, điểm danh, nộp bài, đánh giá, quyền lợi) sẽ được xóa hoàn toàn khỏi hệ thống.`)) {
+                                deleteUser(p.id);
+                              }
+                            }}
                             className="inline-flex items-center space-x-1 px-2.5 py-1 text-xs font-bold text-red-600 hover:bg-red-50 border border-red-200 rounded-lg transition-colors"
                           >
                             <Trash2 className="w-3 h-3" />

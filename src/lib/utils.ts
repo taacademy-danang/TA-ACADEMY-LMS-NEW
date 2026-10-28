@@ -38,9 +38,27 @@ export function calculateWaitingTime(createdAt: string): string {
   return `${diffDays} ngày`;
 }
 
-export function generateStudentCode(existingCount: number = 1): string {
-  const nextNum = existingCount + 1;
-  return `TA-STD-${String(nextNum).padStart(3, '0')}`;
+export function generateStudentCode(existingCodes: (string | number)[] = []): string {
+  const set = new Set(
+    existingCodes.map((c) => (typeof c === 'string' ? c.trim().toUpperCase() : String(c)))
+  );
+  let idx = 1;
+  while (set.has(`TA-STD-${String(idx).padStart(3, '0')}`)) {
+    idx++;
+  }
+  return `TA-STD-${String(idx).padStart(3, '0')}`;
+}
+
+export function generateUniquePassword(existingPasswords: (string | undefined | null)[] = []): string {
+  const existingSet = new Set(existingPasswords.filter(Boolean));
+  let pass = '';
+  let attempts = 0;
+  do {
+    // Sinh mật khẩu 6 số ngẫu nhiên độc nhất không trùng nhau (Ví dụ: 749201)
+    pass = Math.floor(100000 + Math.random() * 900000).toString();
+    attempts++;
+  } while (existingSet.has(pass) && attempts < 100);
+  return pass;
 }
 
 // Giờ kết thúc: Lớp nhóm 1 tiếng rưỡi (90 phút), lớp kèm 1 tiếng (60 phút)
