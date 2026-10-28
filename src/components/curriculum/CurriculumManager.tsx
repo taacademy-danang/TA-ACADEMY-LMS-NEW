@@ -1,14 +1,40 @@
 'use client';
 
-import React, { useState } from 'react';
-import { FileText, BookOpen, Edit2, X, Plus, Trash2, CheckCircle2 } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import {
+  FileText,
+  BookOpen,
+  Edit2,
+  X,
+  Plus,
+  Trash2,
+  UploadCloud,
+  Download,
+  FileSpreadsheet,
+  CheckCircle2,
+  AlertCircle,
+} from 'lucide-react';
 import { useApp } from '@/lib/store';
 import { LessonPlan } from '@/types';
 
-export default function CurriculumManager() {
-  const { courses, lessonPlans, addLessonPlan, editLessonPlan, deleteLessonPlan, showToast } = useApp();
-  const [selectedCourseId, setSelectedCourseId] = useState(courses[0]?.id || 'c-mk');
+interface ParsedLessonRow {
+  session_number: number;
+  content: string;
+  homework: string;
+}
 
+export default function CurriculumManager() {
+  const {
+    courses,
+    lessonPlans,
+    addLessonPlan,
+    editLessonPlan,
+    deleteLessonPlan,
+    batchImportLessonPlans,
+    showToast,
+  } = useApp();
+
+  const [selectedCourseId, setSelectedCourseId] = useState(courses[0]?.id || 'c-mk');
   const selectedCourse = courses.find((c) => c.id === selectedCourseId) || courses[0];
 
   // Lọc giáo án của khóa này và sắp xếp theo số thứ tự buổi học
@@ -36,8 +62,16 @@ export default function CurriculumManager() {
     homework_due_days: 4,
   });
 
+  // Modal tải file giáo án
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [parsedRows, setParsedRows] = useState<ParsedLessonRow[]>([]);
+  const [uploadFileName, setUploadFileName] = useState('');
+  const [overwriteMode, setOverwriteMode] = useState(true);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const handleOpenAdd = () => {
-    const nextSessionNum = plans.length > 0 ? Math.max(...plans.map((p) => p.session_number)) + 1 : 1;
+    const nextSessionNum =
+      plans.length > 0 ? Math.max(...plans.map((p) => p.session_number)) + 1 : 1;
     setAddForm({
       session_number: nextSessionNum,
       title: '',
@@ -62,8 +96,10 @@ export default function CurriculumManager() {
       session_number: Number(addForm.session_number),
       title: addForm.title.trim(),
       content: addForm.content.trim(),
-      homework_title: addForm.homework_title.trim() || `Bài tập thực hành buổi ${addForm.session_number}`,
-      homework_desc: addForm.homework_desc.trim() || 'Học viên quay video thực hành và nộp qua Google Drive.',
+      homework_title:
+        addForm.homework_title.trim() || `Bài tập thực hành buổi ${addForm.session_number}`,
+      homework_desc:
+        addForm.homework_desc.trim() || 'Học viên quay video thực hành và nộp qua Google Drive.',
       homework_due_days: Number(addForm.homework_due_days) || 4,
     });
 
@@ -99,9 +135,143 @@ export default function CurriculumManager() {
   };
 
   const handleDelete = (plan: LessonPlan) => {
-    if (window.confirm(`Bạn có chắc muốn xóa Buổi ${plan.session_number}: ${plan.title} khỏi giáo án?`)) {
+    if (
+      window.confirm(
+        `Bạn có chắc muốn xóa Buổi ${plan.session_number}: ${plan.title} khỏi giáo án?`
+      )
+    ) {
       deleteLessonPlan(plan.id);
     }
+  };
+
+  // Tải file mẫu CSV
+  const handleDownloadSample = () => {
+    const csvContent =
+      'BUỔI,NỘI DUNG HỌC,BÀI TẬP\n' +
+      '1,"Dáng đứng thẳng tựa tường định vị trục sống lưng, mắt nhìn thẳng, thả lỏng bờ vai","Quay video 3 phút đứng tự thế chuẩn và nộp qua link Google Drive"\n' +
+      '2,"Luyện bước đi Runway theo nhịp nhạc sôi động, giữ thăng bằng và đánh tay tự nhiên","Quay video sải bước 15 nhịp đúng phách nhạc tại nhà"\n' +
+      '3,"Giải phóng hình thể, tự tin tương tác ánh mắt và nụ cười rạng rỡ","Quay video 1 phút thể hiện 3 sắc thái biểu cảm gương mặt"\n' +
+      '4,"Kỹ thuật xoay người (Half Turn & Full Turn) dừng tạo dáng cuối thảm đỏ","Quay video thực hành xoay 180 độ và dừng tạo dáng 3 giây"\n';
+
+    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `giao-an-mau-${selectedCourse?.name || 'ta-academy'}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    showToast('Đã tải xuống file giáo án mẫu!');
+  };
+
+  // Đọc và phân tích file giáo án người dùng tải lên
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadFileName(file.name);
+    const reader = new FileReader();
+
+    reader.onload = (event) => {
+      try {
+        const text = event.target?.result as string;
+        const lines = text.split(/\r\n|\n/).filter((l) => l.trim().length > 0);
+
+        if (lines.length <= 1) {
+          showToast('File không có dữ liệu nội dung', 'error');
+          return;
+        }
+
+        // Tách dòng header
+        const headerLine = lines[0];
+        const isComma = headerLine.includes(',');
+        const separator = isComma ? ',' : '\t';
+
+        const parseCsvLine = (line: string): string[] => {
+          const result: string[] = [];
+          let current = '';
+          let inQuotes = false;
+          for (let i = 0; i < line.length; i++) {
+            const char = line[i];
+            if (char === '"') {
+              inQuotes = !inQuotes;
+            } else if (char === separator && !inQuotes) {
+              result.push(current.trim().replace(/^"|"$/g, ''));
+              current = '';
+            } else {
+              current += char;
+            }
+          }
+          result.push(current.trim().replace(/^"|"$/g, ''));
+          return result;
+        };
+
+        const headers = parseCsvLine(headerLine).map((h) =>
+          h.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim()
+        );
+
+        // Tìm vị trí các cột BUỔI, NỘI DUNG HỌC, BÀI TẬP
+        let sessionIdx = headers.findIndex((h) => h.includes('buoi') || h.includes('session'));
+        let contentIdx = headers.findIndex((h) => h.includes('noi dung') || h.includes('content') || h.includes('hoc'));
+        let homeworkIdx = headers.findIndex((h) => h.includes('bai tap') || h.includes('homework') || h.includes('tap'));
+
+        // Nếu file không có header chuẩn, dùng vị trí mặc định 0, 1, 2
+        if (sessionIdx === -1) sessionIdx = 0;
+        if (contentIdx === -1) contentIdx = 1;
+        if (homeworkIdx === -1) homeworkIdx = 2;
+
+        const results: ParsedLessonRow[] = [];
+        for (let i = 1; i < lines.length; i++) {
+          const cols = parseCsvLine(lines[i]);
+          if (cols.length >= 2) {
+            const sessionNum = parseInt(cols[sessionIdx], 10) || i;
+            const content = cols[contentIdx] || '';
+            const homework = cols[homeworkIdx] || '';
+
+            if (content.trim()) {
+              results.push({
+                session_number: sessionNum,
+                content: content.trim(),
+                homework: homework.trim() || 'Học viên luyện tập theo nội dung đã học trên lớp.',
+              });
+            }
+          }
+        }
+
+        if (results.length === 0) {
+          showToast('Không đọc được dòng giáo án hợp lệ nào từ file', 'error');
+          return;
+        }
+
+        setParsedRows(results.sort((a, b) => a.session_number - b.session_number));
+        showToast(`Đã nhận diện thành công ${results.length} buổi học từ file!`);
+      } catch (err) {
+        showToast('Lỗi khi đọc file. Vui lòng kiểm tra định dạng CSV/Excel', 'error');
+      }
+    };
+
+    reader.readAsText(file, 'utf-8');
+  };
+
+  const handleConfirmImport = () => {
+    if (parsedRows.length === 0) {
+      showToast('Chưa có nội dung buổi học nào để lưu', 'error');
+      return;
+    }
+
+    const payload = parsedRows.map((r) => ({
+      session_number: r.session_number,
+      title: `Buổi ${r.session_number}: ${r.content.slice(0, 35)}...`,
+      content: r.content,
+      homework_title: `Bài tập buổi ${r.session_number}`,
+      homework_desc: r.homework,
+      homework_due_days: 4,
+    }));
+
+    batchImportLessonPlans(selectedCourse.id, selectedCourse.name, payload, overwriteMode);
+    setShowUploadModal(false);
+    setParsedRows([]);
+    setUploadFileName('');
   };
 
   return (
@@ -115,7 +285,7 @@ export default function CurriculumManager() {
           </p>
         </div>
 
-        {/* Course switcher with + icon next to courses */}
+        {/* Course switcher */}
         <div className="flex items-center space-x-1.5 bg-white p-1 rounded-xl border border-gray-200 shadow-2xs">
           {courses.map((c) => (
             <button
@@ -130,11 +300,11 @@ export default function CurriculumManager() {
               {c.name}
             </button>
           ))}
-          {/* Nút + nhanh ngay trên thanh chọn môn học */}
+          {/* Nút + nhanh */}
           <button
             onClick={handleOpenAdd}
             className="w-8 h-8 rounded-lg bg-red-50 hover:bg-brand-500 hover:text-white text-brand-500 flex items-center justify-center transition-all border border-red-200"
-            title="Thêm buổi học mới cho môn học này (Không giới hạn số buổi)"
+            title="Thêm buổi học mới cho môn học này"
           >
             <Plus className="w-4 h-4" />
           </button>
@@ -142,14 +312,14 @@ export default function CurriculumManager() {
       </div>
 
       <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm space-y-6">
-        {/* Banner khóa học & Nút + Thêm buổi học */}
+        {/* Banner khóa học & Nút thao tác */}
         <div className="pb-4 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
             <div className="flex items-center space-x-2">
               <h2 className="text-lg font-extrabold text-gray-900">
                 Giáo trình khóa: {selectedCourse?.name}
               </h2>
-              <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-100">
+              <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-100">
                 {plans.length} buổi đã thiết kế
               </span>
             </div>
@@ -158,13 +328,36 @@ export default function CurriculumManager() {
             </p>
           </div>
 
-          <div className="flex items-center space-x-2">
+          {/* Nhóm nút Tải file giáo án lên & Thêm buổi học */}
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={handleDownloadSample}
+              className="inline-flex items-center space-x-1.5 px-3 py-2 border border-gray-200 text-gray-700 hover:bg-gray-50 text-xs font-bold rounded-xl transition-colors"
+              title="Tải file mẫu CSV gồm 3 cột: BUỔI - NỘI DUNG HỌC - BÀI TẬP"
+            >
+              <Download className="w-4 h-4 text-gray-500" />
+              <span>Tải file mẫu</span>
+            </button>
+
+            <button
+              onClick={() => {
+                setParsedRows([]);
+                setUploadFileName('');
+                setShowUploadModal(true);
+              }}
+              className="inline-flex items-center space-x-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-sm shadow-emerald-200 transition-all hover:scale-102"
+              title="Tải lên file giáo án (Excel / CSV) cho khóa này"
+            >
+              <UploadCloud className="w-4 h-4" />
+              <span>Tải file giáo án lên</span>
+            </button>
+
             <button
               onClick={handleOpenAdd}
               className="inline-flex items-center space-x-1.5 px-4 py-2 bg-brand-500 hover:bg-brand-600 text-white text-xs font-bold rounded-xl shadow-sm shadow-red-200 transition-all hover:scale-102"
             >
               <Plus className="w-4 h-4" />
-              <span>Thêm buổi học mới (+)</span>
+              <span>Thêm buổi học (+)</span>
             </button>
           </div>
         </div>
@@ -172,15 +365,30 @@ export default function CurriculumManager() {
         {/* Danh sách từng buổi học với 2 cột: Nội dung học & Bài tập về nhà đính kèm */}
         <div className="space-y-4">
           {plans.length === 0 ? (
-            <div className="p-8 border-2 border-dashed border-gray-200 rounded-2xl text-center space-y-3">
-              <p className="text-xs text-gray-500">Khóa học này chưa có nội dung buổi học nào.</p>
-              <button
-                onClick={handleOpenAdd}
-                className="inline-flex items-center space-x-1.5 px-4 py-2 bg-brand-500 text-white text-xs font-bold rounded-xl"
-              >
-                <Plus className="w-4 h-4" />
-                <span>Nhập buổi học đầu tiên</span>
-              </button>
+            <div className="p-10 border-2 border-dashed border-gray-200 rounded-2xl text-center space-y-3">
+              <FileSpreadsheet className="w-10 h-10 text-gray-400 mx-auto" />
+              <div className="space-y-1">
+                <p className="text-sm font-bold text-gray-700">Khóa học này chưa có nội dung giáo án</p>
+                <p className="text-xs text-gray-500">
+                  Bạn có thể tải file giáo án lên (gồm các cột BUỔI - NỘI DUNG HỌC - BÀI TẬP) hoặc nhấn Thêm buổi học để nhập thủ công.
+                </p>
+              </div>
+              <div className="pt-2 flex justify-center space-x-3">
+                <button
+                  onClick={() => setShowUploadModal(true)}
+                  className="inline-flex items-center space-x-1.5 px-4 py-2 bg-emerald-600 text-white text-xs font-bold rounded-xl"
+                >
+                  <UploadCloud className="w-4 h-4" />
+                  <span>Tải file giáo án lên</span>
+                </button>
+                <button
+                  onClick={handleOpenAdd}
+                  className="inline-flex items-center space-x-1.5 px-4 py-2 bg-brand-500 text-white text-xs font-bold rounded-xl"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Nhập buổi học đầu tiên</span>
+                </button>
+              </div>
             </div>
           ) : (
             plans.map((item) => (
@@ -206,7 +414,7 @@ export default function CurriculumManager() {
                       className="inline-flex items-center space-x-1 px-3 py-1.5 text-xs font-bold text-brand-500 hover:text-white hover:bg-brand-500 border border-brand-300 rounded-xl transition-all"
                     >
                       <Edit2 className="w-3.5 h-3.5" />
-                      <span>Chỉnh sửa nội dung & bài tập</span>
+                      <span>Chỉnh sửa</span>
                     </button>
                     <button
                       onClick={() => handleDelete(item)}
@@ -248,7 +456,7 @@ export default function CurriculumManager() {
             ))
           )}
 
-          {/* Nút + nhanh dạng Card đứt nét ở cuối danh sách để thêm không giới hạn buổi */}
+          {/* Nút + nhanh dạng Card đứt nét ở cuối danh sách */}
           <button
             onClick={handleOpenAdd}
             className="w-full py-4 border-2 border-dashed border-gray-300 hover:border-brand-500 rounded-2xl bg-gray-50/50 hover:bg-red-50/30 text-gray-600 hover:text-brand-500 font-bold text-xs flex items-center justify-center space-x-2 transition-all cursor-pointer"
@@ -258,6 +466,141 @@ export default function CurriculumManager() {
           </button>
         </div>
       </div>
+
+      {/* Modal Tải file giáo án lên (Excel / CSV) */}
+      {showUploadModal && (
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl border border-gray-100 max-h-[90vh] overflow-y-auto animate-scale-up">
+            <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+              <div className="flex items-center space-x-2">
+                <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold">
+                  <UploadCloud className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-gray-900 text-base">
+                    Tải file giáo án lên — Khóa {selectedCourse?.name}
+                  </h3>
+                  <p className="text-[11px] text-gray-500">
+                    File cần có các cột: <strong>BUỔI</strong>, <strong>NỘI DUNG HỌC</strong>, <strong>BÀI TẬP</strong>
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowUploadModal(false)}
+                className="text-gray-400 hover:text-gray-600 p-1 rounded-lg"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="mt-4 space-y-4">
+              {/* Vùng chọn file */}
+              <div
+                onClick={() => fileInputRef.current?.click()}
+                className="border-2 border-dashed border-emerald-300 hover:border-emerald-500 bg-emerald-50/30 rounded-2xl p-6 text-center cursor-pointer transition-all space-y-2"
+              >
+                <FileSpreadsheet className="w-8 h-8 text-emerald-600 mx-auto" />
+                <div>
+                  <p className="text-xs font-bold text-gray-800">
+                    {uploadFileName ? `Đã chọn: ${uploadFileName}` : 'Nhấn để chọn file giáo án từ máy tính (.csv, .xlsx, .txt)'}
+                  </p>
+                  <p className="text-[11px] text-gray-500 mt-0.5">
+                    Hỗ trợ định dạng file Excel xuất CSV, UTF-8 có dấu tiếng Việt
+                  </p>
+                </div>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".csv,.txt,.tsv"
+                  onChange={handleFileUpload}
+                  className="hidden"
+                />
+              </div>
+
+              {/* Tùy chọn Ghi đè hoặc Thêm tiếp */}
+              <div className="p-3 bg-gray-50 rounded-xl border border-gray-200 flex items-center justify-between text-xs">
+                <span className="font-bold text-gray-700">Chế độ nhập:</span>
+                <div className="flex items-center space-x-4">
+                  <label className="flex items-center space-x-1.5 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="importMode"
+                      checked={overwriteMode}
+                      onChange={() => setOverwriteMode(true)}
+                      className="text-brand-500"
+                    />
+                    <span className="font-semibold text-gray-800">Thay thế toàn bộ</span>
+                  </label>
+                  <label className="flex items-center space-x-1.5 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="importMode"
+                      checked={!overwriteMode}
+                      onChange={() => setOverwriteMode(false)}
+                      className="text-brand-500"
+                    />
+                    <span className="font-semibold text-gray-800">Thêm tiếp</span>
+                  </label>
+                </div>
+              </div>
+
+              {/* Xem trước danh sách đã nhận diện từ file */}
+              {parsedRows.length > 0 && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-xs font-bold text-gray-700">
+                    <span>Xem trước dữ liệu ({parsedRows.length} buổi học nhận diện được):</span>
+                    <span className="text-emerald-600 flex items-center space-x-1">
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      <span>Hợp lệ</span>
+                    </span>
+                  </div>
+
+                  <div className="max-h-56 overflow-y-auto border border-gray-200 rounded-xl">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-gray-100/80 sticky top-0 text-[11px] uppercase font-bold text-gray-600">
+                        <tr>
+                          <th className="py-2 px-3 w-16 text-center">Buổi</th>
+                          <th className="py-2 px-3">Nội dung học</th>
+                          <th className="py-2 px-3">Bài tập về nhà</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100 font-medium">
+                        {parsedRows.map((row, idx) => (
+                          <tr key={idx} className="hover:bg-gray-50">
+                            <td className="py-2.5 px-3 text-center font-bold text-brand-500">
+                              {row.session_number}
+                            </td>
+                            <td className="py-2.5 px-3 text-gray-800">{row.content}</td>
+                            <td className="py-2.5 px-3 text-gray-600">{row.homework}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              <div className="pt-3 flex justify-end space-x-2 border-t border-gray-100">
+                <button
+                  type="button"
+                  onClick={() => setShowUploadModal(false)}
+                  className="px-4 py-2 text-xs font-bold text-gray-600 hover:bg-gray-100 rounded-xl"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="button"
+                  disabled={parsedRows.length === 0}
+                  onClick={handleConfirmImport}
+                  className="px-5 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl shadow-md shadow-emerald-200 transition-all hover:scale-102"
+                >
+                  Lưu {parsedRows.length > 0 ? `(${parsedRows.length} buổi)` : ''} vào giáo án
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal Thêm buổi học mới */}
       {showAddModal && (
@@ -289,7 +632,12 @@ export default function CurriculumManager() {
                     min="1"
                     required
                     value={addForm.session_number}
-                    onChange={(e) => setAddForm({ ...addForm, session_number: parseInt(e.target.value, 10) || 1 })}
+                    onChange={(e) =>
+                      setAddForm({
+                        ...addForm,
+                        session_number: parseInt(e.target.value, 10) || 1,
+                      })
+                    }
                     className="w-full px-3 py-2 text-xs bg-gray-50 border border-gray-200 rounded-xl font-bold text-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
                   />
                 </div>
@@ -356,7 +704,12 @@ export default function CurriculumManager() {
                   type="number"
                   min="1"
                   value={addForm.homework_due_days}
-                  onChange={(e) => setAddForm({ ...addForm, homework_due_days: parseInt(e.target.value, 10) || 4 })}
+                  onChange={(e) =>
+                    setAddForm({
+                      ...addForm,
+                      homework_due_days: parseInt(e.target.value, 10) || 4,
+                    })
+                  }
                   className="w-full px-3 py-2 text-xs bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500/20"
                 />
               </div>
@@ -406,7 +759,12 @@ export default function CurriculumManager() {
                     min="1"
                     required
                     value={editForm.session_number}
-                    onChange={(e) => setEditForm({ ...editForm, session_number: parseInt(e.target.value, 10) || 1 })}
+                    onChange={(e) =>
+                      setEditForm({
+                        ...editForm,
+                        session_number: parseInt(e.target.value, 10) || 1,
+                      })
+                    }
                     className="w-full px-3 py-2 text-xs bg-gray-50 border border-gray-200 rounded-xl font-bold text-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
                   />
                 </div>
@@ -469,7 +827,12 @@ export default function CurriculumManager() {
                   type="number"
                   min="1"
                   value={editForm.homework_due_days}
-                  onChange={(e) => setEditForm({ ...editForm, homework_due_days: parseInt(e.target.value, 10) || 4 })}
+                  onChange={(e) =>
+                    setEditForm({
+                      ...editForm,
+                      homework_due_days: parseInt(e.target.value, 10) || 4,
+                    })
+                  }
                   className="w-full px-3 py-2 text-xs bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500/20"
                 />
               </div>

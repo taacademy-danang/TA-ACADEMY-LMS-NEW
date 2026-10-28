@@ -81,7 +81,7 @@ export default function LoginScreen() {
             Đăng nhập nhanh theo vai trò:
           </div>
 
-          <div className="grid grid-cols-2 gap-2 text-xs">
+          <div className="grid grid-cols-3 gap-2 text-xs">
             <button
               type="button"
               onClick={() => handleQuickLogin('admin', '123456')}
@@ -96,8 +96,8 @@ export default function LoginScreen() {
               onClick={() => handleQuickLogin('khauthinga', '123456')}
               className="p-2.5 rounded-xl border border-blue-200 bg-blue-50/60 hover:bg-blue-100 text-left transition-colors"
             >
-              <div className="font-extrabold text-blue-800">👩‍🏫 Cô Nga (GV)</div>
-              <div className="text-[10px] text-gray-500">Được quyền xếp lớp</div>
+              <div className="font-extrabold text-blue-800">Cô Nga (GV)</div>
+              <div className="text-[10px] text-gray-500">Quyền chờ xếp lớp</div>
             </button>
 
             <button
@@ -105,19 +105,13 @@ export default function LoginScreen() {
               onClick={() => handleQuickLogin('vongocnhuy', '123456')}
               className="p-2.5 rounded-xl border border-purple-200 bg-purple-50/60 hover:bg-purple-100 text-left transition-colors"
             >
-              <div className="font-extrabold text-purple-800">👩‍🏫 Cô Như Ý (GV)</div>
-              <div className="text-[10px] text-gray-500">Xem lớp mình dạy</div>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleQuickLogin('0933889900', '123456')}
-              className="p-2.5 rounded-xl border border-emerald-200 bg-emerald-50/60 hover:bg-emerald-100 text-left transition-colors"
-            >
-              <div className="font-extrabold text-emerald-800">🎒 Học Viên Thảo</div>
-              <div className="text-[10px] text-gray-500">Nộp bài tập K98</div>
+              <div className="font-extrabold text-purple-800">Cô Như Ý (GV)</div>
+              <div className="text-[10px] text-gray-500">Giáo viên đào tạo</div>
             </button>
           </div>
+          <p className="text-[10px] text-gray-400 text-center mt-2">
+            Học viên đăng nhập bằng Số điện thoại và mật khẩu được cấp từ hệ thống
+          </p>
         </div>
       </div>
 

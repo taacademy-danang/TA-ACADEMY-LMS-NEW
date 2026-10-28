@@ -85,10 +85,9 @@ export default function TeacherHomeworkManager() {
 
   // Danh sách học viên thuộc lớp này
   const classStudents = useMemo(() => {
-    const list = students.filter(
+    return students.filter(
       (s) => s.class_id === selectedClass?.id || s.class_code === selectedClass?.code
     );
-    return list.length > 0 ? list : students.slice(0, 5);
   }, [students, selectedClass]);
 
   // Bộ lọc tab & search
@@ -185,11 +184,15 @@ export default function TeacherHomeworkManager() {
               onChange={(e) => setSelectedClassId(e.target.value)}
               className="w-full px-3.5 py-2.5 text-xs font-bold bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500/20"
             >
-              {availableClasses.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name} ({c.code})
-                </option>
-              ))}
+              {availableClasses.length === 0 ? (
+                <option value="">-- Chưa có lớp học nào --</option>
+              ) : (
+                availableClasses.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name} ({c.code})
+                  </option>
+                ))
+              )}
             </select>
           </div>
 
@@ -219,22 +222,6 @@ export default function TeacherHomeworkManager() {
           >
             Tải danh sách
           </button>
-        </div>
-      </div>
-
-      {/* 3. Banner thông tin buổi học (Thời gian học & Giáo viên phụ trách) */}
-      <div className="bg-blue-50/70 border border-blue-200/80 rounded-2xl px-5 py-3.5 flex flex-col sm:flex-row sm:items-center sm:justify-between text-xs text-blue-900 font-semibold gap-2">
-        <div className="flex items-center space-x-2">
-          <Clock className="w-4 h-4 text-blue-600" />
-          <span>
-            Thời gian học: <strong className="font-extrabold text-blue-950">{activeSession.start_time} - {activeSession.end_time} ({new Date(activeSession.session_date).toLocaleDateString('vi-VN')})</strong>
-          </span>
-        </div>
-        <div className="flex items-center space-x-2">
-          <User className="w-4 h-4 text-blue-600" />
-          <span>
-            Giáo viên phụ trách: <strong className="font-extrabold text-blue-950">{selectedClass?.teacher_name || 'Khấu Thị Nga'}</strong>
-          </span>
         </div>
       </div>
 

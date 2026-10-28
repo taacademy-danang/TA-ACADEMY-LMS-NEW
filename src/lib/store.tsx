@@ -96,6 +96,12 @@ interface AppContextType {
   addLessonPlan: (plan: Omit<LessonPlan, 'id'>) => void;
   editLessonPlan: (id: string, data: Partial<LessonPlan>) => void;
   deleteLessonPlan: (id: string) => void;
+  batchImportLessonPlans: (
+    courseId: string,
+    courseName: string,
+    plans: Array<{ session_number: number; title: string; content: string; homework_title: string; homework_desc: string; homework_due_days: number }>,
+    overwrite?: boolean
+  ) => void;
 
   // Account management
   toggleLockUser: (userId: string) => void;
@@ -582,6 +588,32 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     showToast('Đã xóa buổi học khỏi giáo án!');
   };
 
+  const batchImportLessonPlans = (
+    courseId: string,
+    courseName: string,
+    plans: Array<{ session_number: number; title: string; content: string; homework_title: string; homework_desc: string; homework_due_days: number }>,
+    overwrite = true
+  ) => {
+    const newPlans: LessonPlan[] = plans.map((p, idx) => ({
+      id: `lp-${Date.now()}-${idx}`,
+      course_id: courseId,
+      course_name: courseName,
+      session_number: p.session_number,
+      title: p.title || `Buổi ${p.session_number}: ${p.content.slice(0, 30)}...`,
+      content: p.content,
+      homework_title: p.homework_title || `Bài tập buổi ${p.session_number}`,
+      homework_desc: p.homework_desc || 'Thực hành theo hướng dẫn giáo án',
+      homework_due_days: p.homework_due_days || 4,
+    }));
+
+    setLessonPlans((prev) => {
+      const remaining = overwrite ? prev.filter((lp) => lp.course_id !== courseId && lp.course_name !== courseName) : prev;
+      return [...remaining, ...newPlans];
+    });
+
+    showToast(`Đã tải lên và lưu ${newPlans.length} buổi học cho khóa ${courseName}!`);
+  };
+
   const toggleLockUser = (userId: string) => {
     setProfiles((prev) =>
       prev.map((p) => {
@@ -680,6 +712,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         addLessonPlan,
         editLessonPlan,
         deleteLessonPlan,
+        batchImportLessonPlans,
         toggleLockUser,
         resetUserPassword,
         deleteUser,

@@ -221,15 +221,17 @@ export default function StudentEvaluationManager() {
             <div>
               <div className="flex items-center space-x-3">
                 <h2 className="text-xl font-extrabold text-gray-900">
-                  {activeStudent?.full_name || 'Lê Hoàng Thu Thảo'}
+                  {activeStudent?.full_name || 'Chưa chọn học viên'}
                 </h2>
-                <span className="text-xs font-bold px-2.5 py-0.5 rounded bg-blue-100 text-blue-800">
-                  {activeStudent?.class_code || 'K98'}
-                </span>
+                {activeStudent?.class_code && (
+                  <span className="text-xs font-bold px-2.5 py-0.5 rounded bg-blue-100 text-blue-800">
+                    {activeStudent.class_code}
+                  </span>
+                )}
               </div>
               <p className="text-xs text-gray-500 mt-1 font-medium">
                 Khóa đào tạo:{' '}
-                <strong className="text-gray-800">{activeStudent?.course_name || 'Model Kids'}</strong>
+                <strong className="text-gray-800">{activeStudent?.course_name || '—'}</strong>
               </p>
             </div>
 

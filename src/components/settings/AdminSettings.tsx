@@ -603,7 +603,14 @@ function syncFromTAAcademy() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {classes.map((cls) => (
+            {classes.length === 0 ? (
+              <div className="col-span-full p-10 bg-white border border-dashed border-gray-200 rounded-2xl text-center text-xs text-gray-400 space-y-2">
+                <BookOpen className="w-8 h-8 text-gray-300 mx-auto" />
+                <p className="font-semibold text-gray-600">Chưa có lớp học nào trong hệ thống</p>
+                <p className="text-[11px] text-gray-400">Nhấn nút &ldquo;+ Tạo Lớp học mới&rdquo; ở góc phải để tạo lớp học đầu tiên.</p>
+              </div>
+            ) : (
+              classes.map((cls) => (
               <div key={cls.id} className="p-5 bg-white rounded-2xl border border-gray-200 shadow-sm space-y-3">
                 <div className="flex justify-between items-center">
                   <span className="text-xs font-extrabold px-2 py-0.5 rounded bg-blue-100 text-blue-900">
@@ -654,7 +661,7 @@ function syncFromTAAcademy() {
                   <p>Phòng học: {cls.room}</p>
                 </div>
               </div>
-            ))}
+            )))}
           </div>
         </div>
       )}

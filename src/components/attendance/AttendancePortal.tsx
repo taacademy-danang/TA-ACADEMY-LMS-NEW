@@ -52,9 +52,7 @@ export default function AttendancePortal() {
     (s) => s.class_id === activeClass?.id && (s.session_date === selectedDate || s.day_of_week === 3)
   );
 
-  const [tempStatus, setTempStatus] = useState<Record<string, AttendanceStatus>>({
-    'std-01': 'unmarked',
-  });
+  const [tempStatus, setTempStatus] = useState<Record<string, AttendanceStatus>>({});
   const [notes, setNotes] = useState<Record<string, string>>({});
 
   const handleSelectStatus = (studentId: string, status: AttendanceStatus) => {

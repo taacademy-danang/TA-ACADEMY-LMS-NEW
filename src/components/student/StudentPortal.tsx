@@ -61,6 +61,18 @@ export default function StudentPortal() {
     }
   };
 
+  if (!student) {
+    return (
+      <div className="bg-white rounded-2xl border border-gray-200 p-12 text-center max-w-2xl mx-auto space-y-3">
+        <AlertCircle className="w-10 h-10 text-brand-500 mx-auto" />
+        <h2 className="text-base font-extrabold text-gray-900">Chưa tìm thấy hồ sơ học viên</h2>
+        <p className="text-xs text-gray-500 leading-relaxed">
+          Tài khoản này chưa được liên kết với hồ sơ học viên trong lớp đào tạo nào. Vui lòng liên hệ ban quản trị học viện T.A để được xếp lớp và cấp quyền.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6 max-w-6xl mx-auto">
       {/* 1. Phần banner đỏ học viên chuẩn 100% Ảnh 3 */}
