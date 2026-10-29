@@ -134,13 +134,43 @@ export default function AttendancePortal() {
     );
   }, [activeSession, attendance]);
 
-  // Danh sách học viên chính thức của lớp
+  // Danh sách học viên của lớp (kết hợp cả học viên chính thức và học viên vừa được xếp lớp)
   const studentList = useMemo(() => {
     if (!activeClass) return [];
-    return students.filter(
+    const officialStudents = students.filter(
       (s) => s.class_id === activeClass.id || (activeClass.code && s.class_code === activeClass.code)
     );
-  }, [students, activeClass]);
+
+    const intakeStudents = (intakeRecords || [])
+      .filter(
+        (r) =>
+          (r.assigned_class_id === activeClass.id || (activeClass.code && r.assigned_class_code === activeClass.code)) &&
+          !officialStudents.some(
+            (s) => (s.phone && s.phone === r.phone) || s.full_name.trim().toLowerCase() === r.full_name.trim().toLowerCase()
+          )
+      )
+      .map((r) => ({
+        id: `intake-${r.id}`,
+        profile_id: '',
+        full_name: r.full_name,
+        phone: r.phone,
+        student_code: r.student_code || 'Chờ cấp mã',
+        course_id: r.course_id,
+        course_name: r.course_name,
+        class_id: r.assigned_class_id || activeClass.id,
+        class_code: r.assigned_class_code || activeClass.code,
+        class_name: r.assigned_class_name || activeClass.name,
+        total_registered_sessions: r.total_sessions,
+        completed_sessions: 0,
+        remaining_sessions: r.total_sessions,
+        absent_sessions: 0,
+        status: 'active' as const,
+        intake_date: r.created_at,
+        created_at: r.created_at,
+      }));
+
+    return [...officialStudents, ...intakeStudents];
+  }, [students, intakeRecords, activeClass]);
 
   const [tempStatus, setTempStatus] = useState<Record<string, AttendanceStatus>>({});
   const [notes, setNotes] = useState<Record<string, string>>({});

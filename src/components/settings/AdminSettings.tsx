@@ -76,6 +76,7 @@ export default function AdminSettings() {
     role: 'teacher' as 'admin' | 'teacher' | 'student',
     phone: '',
     email: '',
+    class_id: '',
   });
 
   // Course form
@@ -136,9 +137,10 @@ export default function AdminSettings() {
       ...accountForm,
       username: accountForm.username || accountForm.phone,
       email: accountForm.email || `${accountForm.username || accountForm.phone}@ta.edu.vn`,
+      class_id: accountForm.class_id || classes[0]?.id || '',
     });
     setShowNewAccountModal(false);
-    setAccountForm({ full_name: '', username: '', role: 'teacher', phone: '', email: '' });
+    setAccountForm({ full_name: '', username: '', role: 'teacher', phone: '', email: '', class_id: '' });
   };
 
   const handleSaveCourse = (e: React.FormEvent) => {
@@ -812,6 +814,134 @@ function syncFromTAAcademy() {
                 {googleAppsScriptCode}
               </pre>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Cấp Tài Khoản Mới */}
+      {showNewAccountModal && (
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-gray-100">
+            <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+              <h3 className="font-extrabold text-gray-900 text-base">Cấp Tài Khoản Mới</h3>
+              <button
+                onClick={() => setShowNewAccountModal(false)}
+                className="text-gray-400 hover:text-gray-600 p-1 rounded-lg"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateAccountSubmit} className="mt-4 space-y-3">
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">
+                  Họ và tên <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ví dụ: Nguyễn Văn A"
+                  value={accountForm.full_name}
+                  onChange={(e) => setAccountForm({ ...accountForm, full_name: e.target.value })}
+                  className="w-full px-3 py-2 text-xs bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">
+                    Số điện thoại <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="tel"
+                    required
+                    placeholder="0905..."
+                    value={accountForm.phone}
+                    onChange={(e) => setAccountForm({ ...accountForm, phone: e.target.value })}
+                    className="w-full px-3 py-2 text-xs bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">Vai trò</label>
+                  <select
+                    value={accountForm.role}
+                    onChange={(e) =>
+                      setAccountForm({
+                        ...accountForm,
+                        role: e.target.value as 'admin' | 'teacher' | 'student',
+                      })
+                    }
+                    className="w-full px-3 py-2 text-xs bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 font-semibold"
+                  >
+                    <option value="student">Học viên</option>
+                    <option value="teacher">Giáo viên</option>
+                    <option value="admin">Ban Giám Đốc (Admin)</option>
+                  </select>
+                </div>
+              </div>
+
+              {accountForm.role === 'student' && (
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">
+                    Xếp vào lớp học <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={accountForm.class_id || (classes[0]?.id || '')}
+                    onChange={(e) => setAccountForm({ ...accountForm, class_id: e.target.value })}
+                    className="w-full px-3 py-2 text-xs bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 font-semibold"
+                  >
+                    {classes.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.code} – {c.name} (GV: {c.teacher_name})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">
+                  Tên đăng nhập <span className="text-gray-400 font-normal">(Để trống sẽ tự động sinh)</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder={accountForm.role === 'student' ? 'Tự động tạo Mã HV (VD: TA-STD-002)' : 'Tự động lấy theo SĐT'}
+                  value={accountForm.username}
+                  onChange={(e) => setAccountForm({ ...accountForm, username: e.target.value })}
+                  className="w-full px-3 py-2 text-xs bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">
+                  Email <span className="text-gray-400 font-normal">(Tùy chọn)</span>
+                </label>
+                <input
+                  type="email"
+                  placeholder="example@ta.edu.vn"
+                  value={accountForm.email}
+                  onChange={(e) => setAccountForm({ ...accountForm, email: e.target.value })}
+                  className="w-full px-3 py-2 text-xs bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+                />
+              </div>
+
+              <div className="pt-3 flex justify-end space-x-2 border-t border-gray-100">
+                <button
+                  type="button"
+                  onClick={() => setShowNewAccountModal(false)}
+                  className="px-4 py-2 text-xs font-bold text-gray-600 hover:bg-gray-100 rounded-xl"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 text-xs font-bold text-white bg-brand-500 hover:bg-brand-600 rounded-xl shadow-md shadow-red-200"
+                >
+                  Cấp tài khoản & Lưu
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

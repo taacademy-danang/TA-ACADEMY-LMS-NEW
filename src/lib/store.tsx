@@ -141,7 +141,7 @@ interface AppContextType {
   resetUserPassword: (userId: string) => string;
   deleteUser: (userId: string) => void;
   deleteStudent: (studentId: string) => void;
-  createNewAccount: (data: { full_name: string; username: string; role: 'admin' | 'teacher' | 'student'; phone: string; email: string; password?: string }) => void;
+  createNewAccount: (data: { full_name: string; username: string; role: 'admin' | 'teacher' | 'student'; phone: string; email: string; password?: string; class_id?: string }) => void;
 
   // Course management
   addCourse: (course: Omit<Course, 'id' | 'created_at'>) => void;
@@ -346,14 +346,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   // 1. Tiếp nhận học viên mới
   const addIntakeRecord = (data: { full_name: string; phone: string; course_id: string; total_sessions: number }) => {
-    const course = courses.find((c) => c.id === data.course_id);
+    const validCourse = courses.find((c) => c.id === data.course_id) || courses[0];
     const newRecord: IntakeRecord = {
       id: `intake-${Date.now()}`,
       full_name: data.full_name,
       phone: data.phone,
-      course_id: data.course_id,
-      course_name: course ? course.name : 'Chưa xác định',
-      total_sessions: data.total_sessions || 16,
+      course_id: validCourse ? validCourse.id : data.course_id,
+      course_name: validCourse ? validCourse.name : 'Chưa xác định',
+      total_sessions: data.total_sessions || validCourse?.total_sessions || 16,
       status: 'pending_class',
       created_at: new Date().toISOString(),
     };
@@ -364,13 +364,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const editIntakeRecord = (id: string, data: { full_name: string; phone: string; course_id: string; total_sessions: number }) => {
-    const course = courses.find((c) => c.id === data.course_id);
+    const validCourse = courses.find((c) => c.id === data.course_id) || courses[0];
     const updated = {
       full_name: data.full_name,
       phone: data.phone,
-      course_id: data.course_id,
-      course_name: course ? course.name : 'Chưa xác định',
-      total_sessions: data.total_sessions,
+      course_id: validCourse ? validCourse.id : data.course_id,
+      course_name: validCourse ? validCourse.name : 'Chưa xác định',
+      total_sessions: data.total_sessions || validCourse?.total_sessions || 16,
       updated_at: new Date().toISOString(),
     };
     setIntakeRecords((prev) =>
@@ -394,14 +394,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    const updatedData = {
-      status: 'assigned_class' as const,
+    const updatedData: Partial<IntakeRecord> = {
+      status: 'assigned_class',
       assigned_class_id: targetClass.id,
       assigned_class_code: targetClass.code,
       assigned_class_name: targetClass.name,
       assigned_teacher_name: targetClass.teacher_name,
       updated_at: new Date().toISOString(),
     };
+    if (targetClass.course_id) {
+      updatedData.course_id = targetClass.course_id;
+    }
+    if (targetClass.course_name) {
+      updatedData.course_name = targetClass.course_name;
+    }
 
     setIntakeRecords((prev) =>
       prev.map((item) => {
@@ -448,20 +454,30 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       updated_at: new Date().toISOString(),
     };
 
+    // Xác định đúng course_id hợp lệ trên Supabase để tránh lỗi khóa ngoại
+    const targetClass = classes.find((c) => c.id === intake.assigned_class_id);
+    const validCourse =
+      courses.find((c) => c.id === intake.course_id) ||
+      courses.find((c) => c.id === targetClass?.course_id) ||
+      courses.find((c) => c.name.toLowerCase() === intake.course_name.toLowerCase()) ||
+      courses[0];
+    const finalCourseId = validCourse ? validCourse.id : intake.course_id;
+    const finalCourseName = validCourse ? validCourse.name : intake.course_name;
+
     const newStudent: Student = {
       id: `std-${Date.now()}`,
       profile_id: newProfile.id,
       full_name: intake.full_name,
       phone: intake.phone,
       student_code: studentCode,
-      course_id: intake.course_id,
-      course_name: intake.course_name,
+      course_id: finalCourseId,
+      course_name: finalCourseName,
       class_id: intake.assigned_class_id,
       class_code: intake.assigned_class_code,
       class_name: intake.assigned_class_name,
-      total_registered_sessions: intake.total_sessions,
+      total_registered_sessions: intake.total_sessions || targetClass?.total_sessions || 16,
       completed_sessions: 0,
-      remaining_sessions: intake.total_sessions,
+      remaining_sessions: intake.total_sessions || targetClass?.total_sessions || 16,
       absent_sessions: 0,
       status: 'active',
       intake_date: intake.created_at,
@@ -474,6 +490,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           c.id === intake.assigned_class_id ? { ...c, student_count: c.student_count + 1 } : c
         )
       );
+      if (targetClass) {
+        dbUpdateClass(targetClass.id, { student_count: targetClass.student_count + 1 });
+      }
     }
 
     const isMilestone = intake.course_name.includes('Model Kids') || intake.course_name.includes('Catwalk');
@@ -483,7 +502,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       student_name: newStudent.full_name,
       student_code: studentCode,
       class_code: intake.assigned_class_code || '',
-      course_name: intake.course_name,
+      course_name: finalCourseName,
       drive_link: '',
       status: 'in_progress',
       is_milestone_17: isMilestone,
@@ -993,7 +1012,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const createNewAccount = (data: { full_name: string; username: string; role: 'admin' | 'teacher' | 'student'; phone: string; email: string; password?: string }) => {
+  const createNewAccount = (data: {
+    full_name: string;
+    username: string;
+    role: 'admin' | 'teacher' | 'student';
+    phone: string;
+    email: string;
+    password?: string;
+    class_id?: string;
+  }) => {
     const allExistingCodes = [
       ...students.map((s) => s.student_code),
       ...profiles.map((p) => p.student_code || ''),
@@ -1017,6 +1044,63 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     };
     setProfiles((prev) => [...prev, newProfile]);
     dbAddProfile(newProfile);
+
+    // Nếu tạo tài khoản học viên: Tự động khởi tạo hồ sơ học viên chính thức trong lớp
+    if (data.role === 'student') {
+      const targetClass = classes.find((c) => c.id === data.class_id) || classes[0];
+      const validCourse = courses.find((c) => c.id === targetClass?.course_id) || courses[0];
+      const totalSessions = targetClass?.total_sessions || validCourse?.total_sessions || 16;
+
+      const newStudent: Student = {
+        id: `std-${Date.now()}`,
+        profile_id: newProfile.id,
+        full_name: data.full_name,
+        phone: data.phone,
+        student_code: studentCode || finalUsername,
+        course_id: validCourse?.id || '',
+        course_name: validCourse?.name || targetClass?.course_name || 'Chưa xác định',
+        class_id: targetClass?.id || '',
+        class_code: targetClass?.code || '',
+        class_name: targetClass?.name || '',
+        total_registered_sessions: totalSessions,
+        completed_sessions: 0,
+        remaining_sessions: totalSessions,
+        absent_sessions: 0,
+        status: 'active',
+        intake_date: new Date().toISOString(),
+        created_at: new Date().toISOString(),
+      };
+
+      setStudents((prev) => [...prev, newStudent]);
+      dbAddStudent(newStudent);
+
+      if (targetClass) {
+        setClasses((prev) =>
+          prev.map((c) => (c.id === targetClass.id ? { ...c, student_count: c.student_count + 1 } : c))
+        );
+        dbUpdateClass(targetClass.id, { student_count: targetClass.student_count + 1 });
+      }
+
+      const newBenefit: StudentBenefit = {
+        id: `ben-${Date.now()}`,
+        student_id: newStudent.id,
+        student_name: newStudent.full_name,
+        student_code: studentCode || finalUsername,
+        class_code: targetClass?.code || '',
+        course_name: validCourse?.name || '',
+        drive_link: '',
+        status: 'in_progress',
+        is_milestone_17: false,
+        completed_sessions: 0,
+        total_registered_sessions: totalSessions,
+        absent_sessions: 0,
+        overdue_days: 0,
+        completed_date: '',
+      };
+      setBenefits((prev) => [...prev, newBenefit]);
+      dbAddBenefit(newBenefit);
+    }
+
     showToast(`Đã cấp tài khoản mới cho ${data.full_name}! (Tài khoản: ${finalUsername}, Mật khẩu: ${pass})`);
   };
 

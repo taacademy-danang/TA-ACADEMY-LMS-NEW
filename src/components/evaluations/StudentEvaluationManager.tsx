@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Users,
   Calendar,
@@ -18,7 +18,7 @@ import { useApp } from '@/lib/store';
 import { Student } from '@/types';
 
 export default function StudentEvaluationManager() {
-  const { students, evaluations, classes, saveEvaluation, currentUser, showToast } = useApp();
+  const { students, intakeRecords, evaluations, classes, saveEvaluation, currentUser, showToast } = useApp();
 
   const isStudent = currentUser.role === 'student';
   const isTeacher = currentUser.role === 'teacher';
@@ -37,12 +37,42 @@ export default function StudentEvaluationManager() {
   );
   const teacherClassCodes = teacherClasses.map((c) => c.code);
 
-  const displayStudents = students.filter((st) => {
-    if (isTeacher) {
-      return teacherClassCodes.includes(st.class_code || '');
-    }
-    return true; // Admin thấy tất cả
-  });
+  const displayStudents = useMemo(() => {
+    const list = [...students];
+    (intakeRecords || []).forEach((r) => {
+      if (
+        (r.assigned_class_id || r.assigned_class_code) &&
+        !list.some((s) => (s.phone && s.phone === r.phone) || s.full_name.trim().toLowerCase() === r.full_name.trim().toLowerCase())
+      ) {
+        list.push({
+          id: `intake-${r.id}`,
+          profile_id: '',
+          full_name: r.full_name,
+          phone: r.phone,
+          student_code: r.student_code || 'Chờ cấp mã',
+          course_id: r.course_id,
+          course_name: r.course_name,
+          class_id: r.assigned_class_id || '',
+          class_code: r.assigned_class_code || '',
+          class_name: r.assigned_class_name || '',
+          total_registered_sessions: r.total_sessions,
+          completed_sessions: 0,
+          remaining_sessions: r.total_sessions,
+          absent_sessions: 0,
+          status: 'active',
+          intake_date: r.created_at,
+          created_at: r.created_at,
+        });
+      }
+    });
+
+    return list.filter((st) => {
+      if (isTeacher) {
+        return teacherClassCodes.includes(st.class_code || '');
+      }
+      return true; // Admin thấy tất cả
+    });
+  }, [students, intakeRecords, isTeacher, teacherClassCodes]);
 
   const [selectedStudentId, setSelectedStudentId] = useState<string>(
     displayStudents[0]?.id || ''

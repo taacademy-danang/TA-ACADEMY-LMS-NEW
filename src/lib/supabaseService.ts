@@ -122,7 +122,21 @@ export async function dbDeleteClass(id: string) {
 // ==========================================
 export async function dbAddIntake(intake: IntakeRecord) {
   if (!isSupabaseConfigured || !supabase) return;
-  await supabase.from('intake_records').insert(intake);
+  const { error } = await supabase.from('intake_records').insert(intake);
+  if (error) {
+    console.error('Error inserting intake record to Supabase:', error);
+    // Nếu lỗi khóa ngoại do course_id, lấy course_id hợp lệ đầu tiên và thử lại
+    if (error.code === '23503') {
+      const { data: cList } = await supabase.from('courses').select('id, name').limit(1);
+      if (cList && cList.length > 0) {
+        await supabase.from('intake_records').insert({
+          ...intake,
+          course_id: cList[0].id,
+          course_name: cList[0].name,
+        });
+      }
+    }
+  }
 }
 
 export async function dbUpdateIntake(id: string, data: Partial<IntakeRecord>) {
@@ -140,7 +154,21 @@ export async function dbDeleteIntake(id: string) {
 // ==========================================
 export async function dbAddStudent(student: Student) {
   if (!isSupabaseConfigured || !supabase) return;
-  await supabase.from('students').insert(student);
+  const { error } = await supabase.from('students').insert(student);
+  if (error) {
+    console.error('Error adding student to Supabase:', error);
+    // Nếu lỗi khóa ngoại do course_id, lấy course_id hợp lệ đầu tiên và thử lại
+    if (error.code === '23503') {
+      const { data: cList } = await supabase.from('courses').select('id, name').limit(1);
+      if (cList && cList.length > 0) {
+        await supabase.from('students').insert({
+          ...student,
+          course_id: cList[0].id,
+          course_name: cList[0].name,
+        });
+      }
+    }
+  }
 }
 
 export async function dbUpdateStudent(id: string, data: Partial<Student>) {
