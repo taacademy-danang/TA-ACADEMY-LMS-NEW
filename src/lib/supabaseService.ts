@@ -143,6 +143,11 @@ export async function dbAddStudent(student: Student) {
   await supabase.from('students').insert(student);
 }
 
+export async function dbUpdateStudent(id: string, data: Partial<Student>) {
+  if (!isSupabaseConfigured || !supabase) return;
+  await supabase.from('students').update(data).eq('id', id);
+}
+
 export async function dbAddProfile(profile: Profile) {
   if (!isSupabaseConfigured || !supabase) return;
   await supabase.from('profiles').insert(profile);
@@ -221,7 +226,26 @@ export async function dbDeleteSession(id: string) {
 // THAO TÁC ĐIỂM DANH (ATTENDANCE)
 // ==========================================
 export async function dbSaveAttendance(records: AttendanceRecord[]) {
-  if (!isSupabaseConfigured || !supabase) return;
+  if (!isSupabaseConfigured || !supabase || records.length === 0) return;
+  // Đảm bảo session_id tồn tại trên Supabase trước khi insert attendance
+  const sessionId = records[0].session_id;
+  const classId = records[0].class_id;
+  if (sessionId) {
+    const { data: existingSess } = await supabase.from('class_sessions').select('id').eq('id', sessionId).maybeSingle();
+    if (!existingSess) {
+      await supabase.from('class_sessions').insert({
+        id: sessionId,
+        class_id: classId,
+        session_number: 1,
+        session_date: new Date().toISOString().split('T')[0],
+        day_of_week: 4,
+        start_time: '15:30',
+        end_time: '17:00',
+        teacher_name: 'Khấu Thị Nga',
+        status: 'completed',
+      });
+    }
+  }
   await supabase.from('attendance_records').upsert(records, { onConflict: 'id' });
 }
 

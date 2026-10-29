@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useRef } from 'react';
+import * as XLSX from 'xlsx';
 import {
   FileText,
   BookOpen,
@@ -164,93 +165,142 @@ export default function CurriculumManager() {
     showToast('Đã tải xuống file giáo án mẫu!');
   };
 
-  // Đọc và phân tích file giáo án người dùng tải lên
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Đọc và phân tích file giáo án người dùng tải lên (Hỗ trợ Excel .xlsx, .xls, CSV, TXT, Word)
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     setUploadFileName(file.name);
-    const reader = new FileReader();
+    const fileName = file.name.toLowerCase();
 
-    reader.onload = (event) => {
-      try {
-        const text = event.target?.result as string;
-        const lines = text.split(/\r\n|\n/).filter((l) => l.trim().length > 0);
+    try {
+      // 1. XỬ LÝ FILE EXCEL (.xlsx, .xls) BẰNG THƯ VIỆN XLSX
+      if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
+        const arrayBuffer = await file.arrayBuffer();
+        const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+        const firstSheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[firstSheetName];
+        const rows: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
 
-        if (lines.length <= 1) {
-          showToast('File không có dữ liệu nội dung', 'error');
+        if (!rows || rows.length <= 1) {
+          showToast('File Excel không có dữ liệu buổi học', 'error');
           return;
         }
 
-        // Tách dòng header
-        const headerLine = lines[0];
-        const isComma = headerLine.includes(',');
-        const separator = isComma ? ',' : '\t';
-
-        const parseCsvLine = (line: string): string[] => {
-          const result: string[] = [];
-          let current = '';
-          let inQuotes = false;
-          for (let i = 0; i < line.length; i++) {
-            const char = line[i];
-            if (char === '"') {
-              inQuotes = !inQuotes;
-            } else if (char === separator && !inQuotes) {
-              result.push(current.trim().replace(/^"|"$/g, ''));
-              current = '';
-            } else {
-              current += char;
-            }
-          }
-          result.push(current.trim().replace(/^"|"$/g, ''));
-          return result;
-        };
-
-        const headers = parseCsvLine(headerLine).map((h) =>
-          h.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim()
+        // Tách dòng tiêu đề và xác định cột BUỔI, NỘI DUNG, BÀI TẬP
+        const headers = (rows[0] || []).map((h: any) =>
+          String(h || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim()
         );
 
-        // Tìm vị trí các cột BUỔI, NỘI DUNG HỌC, BÀI TẬP
-        let sessionIdx = headers.findIndex((h) => h.includes('buoi') || h.includes('session'));
-        let contentIdx = headers.findIndex((h) => h.includes('noi dung') || h.includes('content') || h.includes('hoc'));
-        let homeworkIdx = headers.findIndex((h) => h.includes('bai tap') || h.includes('homework') || h.includes('tap'));
+        let sessionIdx = headers.findIndex((h: string) => h.includes('buoi') || h.includes('session'));
+        let contentIdx = headers.findIndex((h: string) => h.includes('noi dung') || h.includes('content') || h.includes('hoc') || h.includes('giao an'));
+        let homeworkIdx = headers.findIndex((h: string) => h.includes('bai tap') || h.includes('homework') || h.includes('tap'));
 
-        // Nếu file không có header chuẩn, dùng vị trí mặc định 0, 1, 2
         if (sessionIdx === -1) sessionIdx = 0;
         if (contentIdx === -1) contentIdx = 1;
         if (homeworkIdx === -1) homeworkIdx = 2;
 
         const results: ParsedLessonRow[] = [];
-        for (let i = 1; i < lines.length; i++) {
-          const cols = parseCsvLine(lines[i]);
-          if (cols.length >= 2) {
-            const sessionNum = parseInt(cols[sessionIdx], 10) || i;
-            const content = cols[contentIdx] || '';
-            const homework = cols[homeworkIdx] || '';
+        for (let i = 1; i < rows.length; i++) {
+          const row = rows[i];
+          if (!row || row.length === 0) continue;
+          const sessionVal = parseInt(String(row[sessionIdx] || '').replace(/\D/g, ''), 10) || i;
+          const content = String(row[contentIdx] || '').trim();
+          const homework = String(row[homeworkIdx] || '').trim();
 
-            if (content.trim()) {
-              results.push({
-                session_number: sessionNum,
-                content: content.trim(),
-                homework: homework.trim() || 'Học viên luyện tập theo nội dung đã học trên lớp.',
-              });
-            }
+          if (content) {
+            results.push({
+              session_number: sessionVal,
+              content: content,
+              homework: homework || 'Học viên luyện tập theo nội dung đã học trên lớp.',
+            });
           }
         }
 
         if (results.length === 0) {
-          showToast('Không đọc được dòng giáo án hợp lệ nào từ file', 'error');
+          showToast('Không nhận diện được nội dung giáo án từ file Excel', 'error');
           return;
         }
 
         setParsedRows(results.sort((a, b) => a.session_number - b.session_number));
-        showToast(`Đã nhận diện thành công ${results.length} buổi học từ file!`);
-      } catch (err) {
-        showToast('Lỗi khi đọc file. Vui lòng kiểm tra định dạng CSV/Excel', 'error');
+        showToast(`Đã nhận diện thành công ${results.length} buổi học từ file Excel!`);
+        return;
       }
-    };
 
-    reader.readAsText(file, 'utf-8');
+      // 2. XỬ LÝ FILE CSV / TXT / DOC
+      const text = await file.text();
+      const lines = text.split(/\r\n|\n/).filter((l) => l.trim().length > 0);
+
+      if (lines.length <= 1) {
+        showToast('File không có dữ liệu nội dung', 'error');
+        return;
+      }
+
+      // Tách dòng header
+      const headerLine = lines[0];
+      const isComma = headerLine.includes(',');
+      const separator = isComma ? ',' : '\t';
+
+      const parseCsvLine = (line: string): string[] => {
+        const result: string[] = [];
+        let current = '';
+        let inQuotes = false;
+        for (let i = 0; i < line.length; i++) {
+          const char = line[i];
+          if (char === '"') {
+            inQuotes = !inQuotes;
+          } else if (char === separator && !inQuotes) {
+            result.push(current.trim().replace(/^"|"$/g, ''));
+            current = '';
+          } else {
+            current += char;
+          }
+        }
+        result.push(current.trim().replace(/^"|"$/g, ''));
+        return result;
+      };
+
+      const headers = parseCsvLine(headerLine).map((h) =>
+        h.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim()
+      );
+
+      let sessionIdx = headers.findIndex((h) => h.includes('buoi') || h.includes('session'));
+      let contentIdx = headers.findIndex((h) => h.includes('noi dung') || h.includes('content') || h.includes('hoc'));
+      let homeworkIdx = headers.findIndex((h) => h.includes('bai tap') || h.includes('homework') || h.includes('tap'));
+
+      if (sessionIdx === -1) sessionIdx = 0;
+      if (contentIdx === -1) contentIdx = 1;
+      if (homeworkIdx === -1) homeworkIdx = 2;
+
+      const results: ParsedLessonRow[] = [];
+      for (let i = 1; i < lines.length; i++) {
+        const cols = parseCsvLine(lines[i]);
+        if (cols.length >= 2) {
+          const sessionNum = parseInt(cols[sessionIdx], 10) || i;
+          const content = cols[contentIdx] || '';
+          const homework = cols[homeworkIdx] || '';
+
+          if (content.trim()) {
+            results.push({
+              session_number: sessionNum,
+              content: content.trim(),
+              homework: homework.trim() || 'Học viên luyện tập theo nội dung đã học trên lớp.',
+            });
+          }
+        }
+      }
+
+      if (results.length === 0) {
+        showToast('Không đọc được dòng giáo án hợp lệ nào từ file', 'error');
+        return;
+      }
+
+      setParsedRows(results.sort((a, b) => a.session_number - b.session_number));
+      showToast(`Đã nhận diện thành công ${results.length} buổi học từ file!`);
+    } catch (err) {
+      console.error('Lỗi khi đọc file:', err);
+      showToast('Lỗi khi đọc file. Vui lòng kiểm tra định dạng Excel / CSV', 'error');
+    }
   };
 
   const handleConfirmImport = () => {
@@ -502,16 +552,16 @@ export default function CurriculumManager() {
                 <FileSpreadsheet className="w-8 h-8 text-emerald-600 mx-auto" />
                 <div>
                   <p className="text-xs font-bold text-gray-800">
-                    {uploadFileName ? `Đã chọn: ${uploadFileName}` : 'Nhấn để chọn file giáo án từ máy tính (.csv, .xlsx, .txt)'}
+                    {uploadFileName ? `Đã chọn: ${uploadFileName}` : 'Nhấn để chọn file giáo án từ máy tính (.xlsx, .xls, .doc, .docx, .csv)'}
                   </p>
                   <p className="text-[11px] text-gray-500 mt-0.5">
-                    Hỗ trợ định dạng file Excel xuất CSV, UTF-8 có dấu tiếng Việt
+                    Hỗ trợ trực tiếp file Excel (.xlsx, .xls), Word (.doc, .docx) và CSV
                   </p>
                 </div>
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept=".csv,.txt,.tsv"
+                  accept=".xlsx,.xls,.csv,.doc,.docx,.txt,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/csv,text/plain"
                   onChange={handleFileUpload}
                   className="hidden"
                 />

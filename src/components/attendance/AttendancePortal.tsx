@@ -231,12 +231,15 @@ export default function AttendancePortal() {
       (a) =>
         (myStudent?.id && a.student_id === myStudent.id) ||
         (myStudent?.student_code && a.student_code === myStudent.student_code) ||
-        (myStudent?.full_name && a.student_name === myStudent.full_name)
+        (myStudent?.full_name && a.student_name === myStudent.full_name) ||
+        (currentUser.student_code && a.student_code === currentUser.student_code)
     );
 
-    const completedCount = myStudent?.completed_sessions || myAttendance.filter((a) => a.status === 'present').length;
-    const absentCountStudent = myStudent?.absent_sessions || myAttendance.filter((a) => a.status === 'absent').length;
-    const totalRegistered = myStudent?.total_registered_sessions || 16;
+    const presentRecords = myAttendance.filter((a) => a.status === 'present');
+    const absentRecords = myAttendance.filter((a) => a.status === 'absent');
+    const completedCount = Math.max(myStudent?.completed_sessions || 0, presentRecords.length);
+    const absentCountStudent = Math.max(myStudent?.absent_sessions || 0, absentRecords.length);
+    const totalRegistered = myStudent?.total_registered_sessions || 20;
     const remainingCount = Math.max(0, totalRegistered - completedCount);
 
     return (

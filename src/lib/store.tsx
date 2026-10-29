@@ -44,6 +44,7 @@ import {
   dbUpdateIntake,
   dbDeleteIntake,
   dbAddStudent,
+  dbUpdateStudent,
   dbDeleteStudentCompletely,
   dbAddProfile,
   dbUpdateProfile,
@@ -619,14 +620,21 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     dbSaveAttendance(newAttendanceList);
 
     records.forEach((rec) => {
+      const studentObj = students.find((s) => s.id === rec.student_id);
+      const benefitObj = benefits.find((b) => b.student_id === rec.student_id);
+
       if (rec.status === 'present') {
+        const nextCompleted = (studentObj?.completed_sessions || 0) + 1;
+        const totalReg = studentObj?.total_registered_sessions || 20;
+        const nextRemaining = Math.max(0, totalReg - nextCompleted);
+
         setStudents((prev) =>
           prev.map((s) =>
             s.id === rec.student_id
               ? {
                   ...s,
-                  completed_sessions: s.completed_sessions + 1,
-                  remaining_sessions: Math.max(0, s.remaining_sessions - 1),
+                  completed_sessions: nextCompleted,
+                  remaining_sessions: nextRemaining,
                 }
               : s
           )
@@ -636,27 +644,44 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             b.student_id === rec.student_id
               ? {
                   ...b,
-                  completed_sessions: b.completed_sessions + 1,
-                  remaining_sessions: Math.max(0, b.total_registered_sessions - (b.completed_sessions + 1)),
+                  completed_sessions: nextCompleted,
+                  remaining_sessions: nextRemaining,
                 }
               : b
           )
         );
+
+        // Đồng bộ số buổi đã học lên Supabase Database
+        dbUpdateStudent(rec.student_id, {
+          completed_sessions: nextCompleted,
+          remaining_sessions: nextRemaining,
+        });
+        if (benefitObj) {
+          dbUpdateBenefit(benefitObj.id, {
+            completed_sessions: nextCompleted,
+          });
+        }
       } else if (rec.status === 'absent') {
+        const nextAbsent = (studentObj?.absent_sessions || 0) + 1;
         setStudents((prev) =>
           prev.map((s) =>
             s.id === rec.student_id
-              ? { ...s, absent_sessions: (s.absent_sessions || 0) + 1 }
+              ? { ...s, absent_sessions: nextAbsent }
               : s
           )
         );
         setBenefits((prev) =>
           prev.map((b) =>
             b.student_id === rec.student_id
-              ? { ...b, absent_sessions: b.absent_sessions + 1 }
+              ? { ...b, absent_sessions: nextAbsent }
               : b
           )
         );
+
+        // Đồng bộ số buổi vắng lên Supabase
+        dbUpdateStudent(rec.student_id, {
+          absent_sessions: nextAbsent,
+        });
       }
     });
 
