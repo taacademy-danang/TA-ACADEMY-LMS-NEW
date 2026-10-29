@@ -794,6 +794,44 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       showToast('Đã lưu nhận xét đánh giá học viên thành công!');
     }
     dbSaveEvaluation(savedEval);
+
+    // TỰ ĐỘNG ĐỒNG BỘ ĐIỂM DANH: Khi cô giáo đánh giá buổi học, tự động cập nhật trạng thái "Đã điểm danh (Có mặt)"
+    if (data.session_date && data.student_id) {
+      const studentObj = students.find((s) => s.id === data.student_id || s.full_name === data.student_name);
+      const studentCode = studentObj?.student_code || '';
+      const existingAtt = attendance.find(
+        (a) =>
+          (a.student_id === data.student_id || (studentCode && a.student_code === studentCode) || a.student_name === data.student_name) &&
+          (sessions.find((s) => s.id === a.session_id)?.session_date === data.session_date || a.marked_at?.startsWith(data.session_date))
+      );
+
+      if (!existingAtt || existingAtt.status !== 'present') {
+        const classObj = classes.find((c) => c.id === data.class_id || c.code === data.class_code);
+        const targetClassId = data.class_id || classObj?.id || studentObj?.class_id || 'cls-default';
+        const targetSessionId = `sess-${targetClassId}-${data.session_date}`;
+
+        saveAttendance(
+          targetSessionId,
+          targetClassId,
+          [
+            {
+              student_id: data.student_id,
+              student_name: data.student_name,
+              student_code: studentCode,
+              status: 'present',
+              notes: 'Có mặt (Cô giáo đã đánh giá buổi học)',
+            },
+          ],
+          {
+            session_date: data.session_date,
+            class_name: classObj?.name || studentObj?.class_name || 'Lớp đào tạo T.A',
+            class_code: classObj?.code || data.class_code || studentObj?.class_code || '',
+            course_name: classObj?.course_name || data.course_name || studentObj?.course_name || '',
+            teacher_name: currentUser.full_name,
+          }
+        );
+      }
+    }
   };
 
   const submitHomework = (assignmentId: string, studentId: string, studentName: string, link: string) => {
