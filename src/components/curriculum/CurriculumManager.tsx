@@ -187,34 +187,87 @@ export default function CurriculumManager() {
           return;
         }
 
-        // Tách dòng tiêu đề và xác định cột BUỔI, NỘI DUNG, BÀI TẬP
-        const headers = (rows[0] || []).map((h: any) =>
-          String(h || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim()
-        );
+        // Tự động quét tìm dòng tiêu đề thật (bỏ qua dòng tên giáo án hoặc dòng trống ở trên)
+        let headerRowIndex = -1;
+        let sessionCol = 0;
+        let contentCol = 1;
+        let homeworkCol = 2;
 
-        let sessionIdx = headers.findIndex((h: string) => h.includes('buoi') || h.includes('session'));
-        let contentIdx = headers.findIndex((h: string) => h.includes('noi dung') || h.includes('content') || h.includes('hoc') || h.includes('giao an'));
-        let homeworkIdx = headers.findIndex((h: string) => h.includes('bai tap') || h.includes('homework') || h.includes('tap'));
+        for (let r = 0; r < Math.min(rows.length, 10); r++) {
+          const row = rows[r] || [];
+          const normalized = row.map((cell: any) =>
+            String(cell || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim()
+          );
 
-        if (sessionIdx === -1) sessionIdx = 0;
-        if (contentIdx === -1) contentIdx = 1;
-        if (homeworkIdx === -1) homeworkIdx = 2;
+          // Cột buổi: chứa 'buoi', 'session', 'stt' và KHÔNG chứa 'giao an', 'khoa'
+          const sIdx = normalized.findIndex(
+            (c: string) => /^(buoi|session|stt)$/.test(c) || (c.includes('buoi') && !c.includes('giao an') && !c.includes('khoa'))
+          );
+          // Cột nội dung: chứa 'noi dung', 'dao tao', 'bai hoc', 'chu de'
+          const cIdx = normalized.findIndex(
+            (c: string) => c.includes('noi dung') || c.includes('dao tao') || c.includes('bai hoc') || c.includes('chu de')
+          );
+          // Cột bài tập: chứa 'bai tap', 've nha', 'homework'
+          const hIdx = normalized.findIndex(
+            (c: string) => c.includes('bai tap') || c.includes('ve nha') || c.includes('homework')
+          );
+
+          if (sIdx !== -1 && cIdx !== -1) {
+            headerRowIndex = r;
+            sessionCol = sIdx;
+            contentCol = cIdx;
+            homeworkCol = hIdx !== -1 ? hIdx : (cIdx === 1 ? 2 : 1);
+          }
+        }
+
+        // Nếu không tìm thấy bằng từ khóa, mặc định lấy dòng đầu tiên có ít nhất 2 cột
+        if (headerRowIndex === -1) {
+          headerRowIndex = rows.findIndex((r: any[]) => r && r.length >= 2) || 0;
+          sessionCol = 0;
+          contentCol = 1;
+          homeworkCol = 2;
+        }
 
         const results: ParsedLessonRow[] = [];
-        for (let i = 1; i < rows.length; i++) {
+        for (let i = headerRowIndex + 1; i < rows.length; i++) {
           const row = rows[i];
           if (!row || row.length === 0) continue;
-          const sessionVal = parseInt(String(row[sessionIdx] || '').replace(/\D/g, ''), 10) || i;
-          const content = String(row[contentIdx] || '').trim();
-          const homework = String(row[homeworkIdx] || '').trim();
 
-          if (content) {
-            results.push({
-              session_number: sessionVal,
-              content: content,
-              homework: homework || 'Học viên luyện tập theo nội dung đã học trên lớp.',
-            });
+          const rawSession = String(row[sessionCol] || '').trim();
+          const rawContent = String(row[contentCol] || '').trim();
+          const rawHomework = String(row[homeworkCol] || '').trim();
+
+          // Bỏ qua dòng tiêu đề lặp lại hoặc dòng chứa chữ BUỔI, NỘI DUNG, GIÁO ÁN
+          const normSession = rawSession.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+          const normContent = rawContent.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+          if (
+            normSession.includes('buoi') ||
+            normContent.includes('noi dung') ||
+            normSession.includes('giao an') ||
+            normContent.includes('giao an')
+          ) {
+            continue;
           }
+
+          const numMatch = rawSession.match(/\d+/);
+          const sessionVal = numMatch ? parseInt(numMatch[0], 10) : results.length + 1;
+
+          let finalContent = rawContent;
+          // Trường hợp nội dung chỉ là số hoặc trống, tìm cột có chữ dài nhất làm nội dung
+          if (!finalContent || /^\d+$/.test(finalContent)) {
+            const candidate = row.find(
+              (c: any, idx: number) => idx !== sessionCol && String(c || '').trim().length > 10
+            );
+            if (candidate) finalContent = String(candidate).trim();
+          }
+
+          if (!finalContent) continue;
+
+          results.push({
+            session_number: sessionVal,
+            content: finalContent,
+            homework: rawHomework || 'Học viên luyện tập theo nội dung đã học trên lớp.',
+          });
         }
 
         if (results.length === 0) {
@@ -347,7 +400,7 @@ export default function CurriculumManager() {
                   : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
               }`}
             >
-              {c.name}
+              {c.code || c.name}
             </button>
           ))}
           {/* Nút + nhanh */}
@@ -367,7 +420,7 @@ export default function CurriculumManager() {
           <div>
             <div className="flex items-center space-x-2">
               <h2 className="text-lg font-extrabold text-gray-900">
-                Giáo trình khóa: {selectedCourse?.name}
+                Giáo trình khóa: {selectedCourse?.code ? `${selectedCourse.code} – ${selectedCourse.name}` : selectedCourse?.name}
               </h2>
               <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-100">
                 {plans.length} buổi đã thiết kế
@@ -528,7 +581,7 @@ export default function CurriculumManager() {
                 </div>
                 <div>
                   <h3 className="font-extrabold text-gray-900 text-base">
-                    Tải file giáo án lên — Khóa {selectedCourse?.name}
+                    Tải file giáo án lên — Khóa {selectedCourse?.code ? `${selectedCourse.code} – ${selectedCourse.name}` : selectedCourse?.name}
                   </h3>
                   <p className="text-[11px] text-gray-500">
                     File cần có các cột: <strong>BUỔI</strong>, <strong>NỘI DUNG HỌC</strong>, <strong>BÀI TẬP</strong>
