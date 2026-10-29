@@ -10,10 +10,17 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    login(username, password, rememberMe);
+    if (loading) return;
+    setLoading(true);
+    try {
+      await login(username, password, rememberMe);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -85,9 +92,10 @@ export default function LoginScreen() {
 
           <button
             type="submit"
-            className="w-full py-3 bg-brand-500 hover:bg-brand-600 text-white text-xs font-bold rounded-xl shadow-lg shadow-red-200 transition-all hover:scale-[1.01] flex items-center justify-center space-x-2 mt-2"
+            disabled={loading}
+            className="w-full py-3 bg-brand-500 hover:bg-brand-600 disabled:bg-brand-300 text-white text-xs font-bold rounded-xl shadow-lg shadow-red-200 transition-all hover:scale-[1.01] flex items-center justify-center space-x-2 mt-2"
           >
-            <span>Đăng Nhập Vào Hệ Thống</span>
+            <span>{loading ? 'Đang xác thực tài khoản...' : 'Đăng Nhập Vào Hệ Thống'}</span>
             <ArrowRight className="w-4 h-4" />
           </button>
         </form>

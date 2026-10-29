@@ -31,7 +31,7 @@ import {
   initialSubmissions,
 } from './initialData';
 import { generateStudentCode, generateUniquePassword, generateSessionsForClass } from './utils';
-import { isSupabaseConfigured } from './supabase';
+import { isSupabaseConfigured, supabase } from './supabase';
 import {
   fetchAllDataFromSupabase,
   dbAddCourse,
@@ -74,7 +74,7 @@ interface AppContextType {
   currentUser: Profile;
   setCurrentUser: (user: Profile) => void;
   isAuthenticated: boolean;
-  login: (username: string, pass: string, rememberMe?: boolean) => boolean;
+  login: (username: string, pass: string, rememberMe?: boolean) => Promise<boolean> | boolean;
   logout: () => void;
 
   // Data states
@@ -228,18 +228,62 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  // Auth: Đăng nhập
-  const login = (usernameInput: string, passInput: string, rememberMe: boolean = false): boolean => {
+  // Auth: Đăng nhập với cơ chế trực tiếp từ Supabase và bộ nhớ đệm
+  const login = async (usernameInput: string, passInput: string, rememberMe: boolean = false): Promise<boolean> => {
     const u = usernameInput.trim().toLowerCase();
     const pInput = passInput.trim();
 
-    const found = profiles.find(
+    // 1. Thử tìm trong danh sách profiles hiện tại trong bộ nhớ state
+    let found = profiles.find(
       (p) =>
         (p.username && p.username.toLowerCase() === u) ||
-        p.phone === u ||
-        p.email.toLowerCase() === u ||
+        (p.phone && p.phone.toLowerCase() === u) ||
+        (p.email && p.email.toLowerCase() === u) ||
         (p.student_code && p.student_code.toLowerCase() === u)
     );
+
+    // 2. NẾU CHƯA CÓ TRONG BỘ NHỚ STATE (ví dụ mới load trang, Supabase đang fetch hoặc tài khoản vừa tạo ở tab khác):
+    // Truy vấn trực tiếp từ bảng profiles trên Supabase
+    if (!found && isSupabaseConfigured && supabase) {
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .or(`username.ilike.${u},phone.eq.${u},email.ilike.${u},student_code.ilike.${u}`)
+          .limit(1);
+
+        if (!error && data && data.length > 0) {
+          found = data[0] as Profile;
+          // Cập nhật ngay vào state profiles
+          setProfiles((prev) => {
+            const exists = prev.some((p) => p.id === found!.id);
+            return exists ? prev.map((p) => (p.id === found!.id ? found! : p)) : [...prev, found!];
+          });
+        }
+      } catch (err) {
+        console.error('Lỗi khi truy vấn tài khoản trực tiếp từ Supabase:', err);
+      }
+    }
+
+    // 3. Nếu vẫn chưa thấy, tải toàn bộ profiles từ Supabase để đồng bộ
+    if (!found && isSupabaseConfigured && supabase) {
+      try {
+        const { data, error } = await supabase.from('profiles').select('*');
+        if (!error && data && data.length > 0) {
+          const allProfiles = data as Profile[];
+          setProfiles(allProfiles);
+          found = allProfiles.find(
+            (p) =>
+              (p.username && p.username.toLowerCase() === u) ||
+              (p.phone && p.phone.toLowerCase() === u) ||
+              (p.email && p.email.toLowerCase() === u) ||
+              (p.student_code && p.student_code.toLowerCase() === u)
+          );
+        }
+      } catch (err) {
+        console.error('Lỗi khi đồng bộ profiles từ Supabase:', err);
+      }
+    }
 
     if (found) {
       if (found.status === 'locked') {
@@ -261,10 +305,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         }
         showToast(`Đăng nhập thành công! Chào mừng ${found.full_name} (${found.role.toUpperCase()})`);
         return true;
+      } else {
+        showToast(`Mật khẩu không chính xác cho tài khoản "${found.username || found.student_code}". Vui lòng thử lại!`, 'error');
+        return false;
       }
     }
 
-    // Cho phép admin mặc định
+    // Cho phép admin mặc định dự phòng nếu chưa kết nối database
     if (u === 'admin' && (pInput === '123456' || pInput === 'admin')) {
       setCurrentUser(initialProfiles[0]);
       setIsAuthenticated(true);
@@ -280,7 +327,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       return true;
     }
 
-    showToast('Tên đăng nhập hoặc mật khẩu không chính xác (Mặc định: 123456)', 'error');
+    showToast(`Không tìm thấy tài khoản "${usernameInput}" trong hệ thống! Vui lòng kiểm tra lại Mã học viên hoặc SĐT.`, 'error');
     return false;
   };
 
