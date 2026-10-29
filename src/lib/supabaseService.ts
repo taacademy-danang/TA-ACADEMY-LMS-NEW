@@ -202,6 +202,11 @@ export async function dbAddSession(session: ClassSession) {
   await supabase.from('class_sessions').insert(session);
 }
 
+export async function dbBatchAddSessions(sessions: ClassSession[]) {
+  if (!isSupabaseConfigured || !supabase || sessions.length === 0) return;
+  await supabase.from('class_sessions').insert(sessions);
+}
+
 export async function dbUpdateSession(id: string, data: Partial<ClassSession>) {
   if (!isSupabaseConfigured || !supabase) return;
   await supabase.from('class_sessions').update(data).eq('id', id);

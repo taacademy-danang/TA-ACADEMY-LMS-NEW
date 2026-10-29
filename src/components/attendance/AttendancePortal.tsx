@@ -16,7 +16,7 @@ import {
   Lock,
 } from 'lucide-react';
 import { useApp } from '@/lib/store';
-import { AttendanceStatus } from '@/types';
+import { AttendanceStatus, ClassSession } from '@/types';
 import { formatDate } from '@/lib/utils';
 
 export default function AttendancePortal() {
@@ -31,10 +31,21 @@ export default function AttendancePortal() {
     return new Date().toISOString().split('T')[0];
   });
 
+  // Lấy thứ trong tuần của ngày được chọn (1: Thứ 2, 2: Thứ 3, ..., 7: Chủ nhật)
+  const selectedDayOfWeek = useMemo(() => {
+    const parts = selectedDate.split('-');
+    if (parts.length !== 3) return 1;
+    const d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+    const jsDay = d.getDay();
+    return jsDay === 0 ? 7 : jsDay;
+  }, [selectedDate]);
+
   // Lọc các buổi học có lịch diễn ra vào đúng ngày selectedDate từ Thời khóa biểu (sessions)
   const dateSessions = useMemo(() => {
-    return sessions.filter((s) => {
-      if (s.session_date !== selectedDate) return false;
+    // 1. Tìm các buổi học có ngày trùng khớp chính xác trong sessions
+    const directMatched = sessions.filter((s) => {
+      const matchesDate = s.session_date === selectedDate;
+      if (!matchesDate) return false;
       if (isTeacher) {
         return (
           s.teacher_id === currentUser.id ||
@@ -44,7 +55,50 @@ export default function AttendancePortal() {
       }
       return true; // Admin thấy tất cả các lớp trong ngày
     });
-  }, [sessions, selectedDate, isTeacher, currentUser]);
+
+    // 2. Dự phòng: Nếu sessions chưa kịp nạp nhưng lớp học trong classes có lịch học vào thứ này
+    const classFallbacks = classes
+      .filter((c) => {
+        if (!c.days_of_week?.includes(selectedDayOfWeek)) return false;
+        if (c.start_date && c.start_date > selectedDate) return false;
+        if (isTeacher) {
+          return (
+            c.teacher_id === currentUser.id ||
+            c.teacher_name === currentUser.full_name ||
+            c.teacher_name?.includes(currentUser.full_name)
+          );
+        }
+        return true;
+      })
+      .map((c) => ({
+        id: `sess-${c.id}-${selectedDate}`,
+        class_id: c.id,
+        class_code: c.code,
+        class_name: c.name,
+        course_name: c.course_name,
+        session_type: c.class_type === 'one_on_one' ? ('private' as const) : ('group' as const),
+        session_number: 1,
+        session_date: selectedDate,
+        day_of_week: selectedDayOfWeek,
+        start_time: c.start_time,
+        end_time: c.end_time,
+        teacher_id: c.teacher_id,
+        teacher_name: c.teacher_name,
+        room: c.room || 'Phòng Studio A1',
+        status: 'scheduled' as const,
+      }));
+
+    // Gộp và loại trừ trùng lặp theo class_id
+    const combinedMap = new Map<string, ClassSession>();
+    directMatched.forEach((s) => combinedMap.set(s.class_id || s.id, s));
+    classFallbacks.forEach((s) => {
+      if (!combinedMap.has(s.class_id)) {
+        combinedMap.set(s.class_id, s);
+      }
+    });
+
+    return Array.from(combinedMap.values());
+  }, [sessions, classes, selectedDate, selectedDayOfWeek, isTeacher, currentUser]);
 
   const [selectedSessionId, setSelectedSessionId] = useState<string>('');
 

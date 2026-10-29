@@ -49,6 +49,7 @@ import {
   dbUpdateProfile,
   dbDeleteProfile,
   dbAddSession,
+  dbBatchAddSessions,
   dbUpdateSession,
   dbDeleteSession,
   dbSaveAttendance,
@@ -536,9 +537,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setClasses((prev) => [newClass, ...prev]);
     setSessions((prev) => [...prev, ...generatedSessions]);
 
-    // Lưu vào Supabase
+    // Lưu vào Supabase đồng bộ toàn bộ sessions trong 1 lệnh duy nhất
     dbAddClass(newClass);
-    generatedSessions.forEach((s) => dbAddSession(s));
+    dbBatchAddSessions(generatedSessions);
 
     showToast(`Đã tạo lớp ${newClass.code} và tự động sinh ${generatedSessions.length} buổi học trên Thời khóa biểu!`);
   };
