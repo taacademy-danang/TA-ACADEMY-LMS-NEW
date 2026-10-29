@@ -24,16 +24,22 @@ import {
   Code,
   X,
   ExternalLink,
+  Download,
 } from 'lucide-react';
 import { useApp } from '@/lib/store';
 import { Profile, Course, ClassItem, ClassType } from '@/types';
 import { calculateClassEndTime } from '@/lib/utils';
+import { exportAttendanceAndBenefitsToExcel } from '@/lib/exportUtils';
 
 export default function AdminSettings() {
   const {
     profiles,
     courses,
     classes,
+    students,
+    sessions,
+    attendance,
+    benefits,
     toggleLockUser,
     resetUserPassword,
     deleteUser,
@@ -197,31 +203,262 @@ export default function AdminSettings() {
     }
   };
 
+  const handleExportExcel = () => {
+    exportAttendanceAndBenefitsToExcel({
+      students,
+      classes,
+      sessions,
+      attendance,
+      benefits,
+    });
+    showToast('Đã xuất file Excel bảng theo dõi điểm danh & quyền lợi thành công!');
+  };
+
   const googleAppsScriptCode = `/**
- * T.A ACADEMY E-LEARNING — GOOGLE APPS SCRIPT ĐỒNG BỘ TỰ ĐỘNG
- * Hướng dẫn: Mở Google Sheet -> Extensions -> Apps Script -> Dán mã này -> Save -> Run syncFromTAAcademy
+ * T.A ACADEMY E-LEARNING — GOOGLE APPS SCRIPT ĐỒNG BỘ ĐIỂM DANH & QUYỀN LỢI HỌC VIÊN
+ * Bảng tính: THEO DÕI ĐIỂM DANH & QUYỀN LỢI HỌC VIÊN
+ * 
+ * Hướng dẫn 3 bước thiết lập:
+ * 1. Mở file Google Sheet của bạn -> Tiện ích mở rộng (Extensions) -> Apps Script
+ * 2. Xóa toàn bộ mã cũ, dán đoạn mã này vào -> Nhấn Lưu (Ctrl + S)
+ * 3. Chọn hàm 'dongBoDiemDanhQuyenLoi' và nhấn Chạy (Run). Bảng tính sẽ tự động sinh và tô màu hoàn chỉnh!
  */
 
-function syncFromTAAcademy() {
-  const SPREADSHEET = SpreadsheetApp.getActiveSpreadsheet();
-  
-  // 1. Tạo hoặc chọn Sheet Điểm Danh
-  let sheetDiemDanh = SPREADSHEET.getSheetByName("ĐIỂM DANH T.A");
-  if (!sheetDiemDanh) {
-    sheetDiemDanh = SPREADSHEET.insertSheet("ĐIỂM DANH T.A");
-    sheetDiemDanh.appendRow(["STT", "Mã Học Viên", "Họ và Tên", "Khóa Học", "Mã Lớp", "Trạng Thái", "Ngày Điểm Danh", "Ghi Chú"]);
-    sheetDiemDanh.getRange(1, 1, 1, 8).setFontWeight("bold").setBackground("#B51225").setFontColor("#FFFFFF");
+const SUPABASE_URL = "https://wtbkarkekozazuteuzxj.supabase.co";
+const SUPABASE_KEY = "sb_publishable_lkGa7Wrgq4xMxeSqIeJpeQ_f_s3bKnu";
+
+function onOpen() {
+  SpreadsheetApp.getUi()
+    .createMenu("🚀 T.A ACADEMY")
+    .addItem("🔄 Đồng bộ Điểm Danh & Quyền Lợi ngay", "dongBoDiemDanhQuyenLoi")
+    .addItem("⏰ Bật tự động cập nhật (15 phút/lần)", "batTuDongDongBo")
+    .addToUi();
+}
+
+function batTuDongDongBo() {
+  const triggers = ScriptApp.getProjectTriggers();
+  for (let i = 0; i < triggers.length; i++) {
+    if (triggers[i].getHandlerFunction() === "dongBoDiemDanhQuyenLoi") {
+      ScriptApp.deleteTrigger(triggers[i]);
+    }
+  }
+  ScriptApp.newTrigger("dongBoDiemDanhQuyenLoi")
+    .timeBased()
+    .everyMinutes(15)
+    .create();
+  SpreadsheetApp.getUi().alert("✅ Đã bật tự động đồng bộ mỗi 15 phút! Bảng tính sẽ luôn cập nhật tự động.");
+}
+
+function dongBoDiemDanhQuyenLoi() {
+  const SS = SpreadsheetApp.getActiveSpreadsheet();
+  const SHEET_NAME = "THEO DÕI ĐIỂM DANH & QUYỀN LỢI HỌC VIÊN";
+  let sheet = SS.getSheetByName(SHEET_NAME);
+  if (!sheet) {
+    sheet = SS.insertSheet(SHEET_NAME);
   }
 
-  // 2. Tạo hoặc chọn Sheet Quyền Lợi & Video
-  let sheetQuyenLoi = SPREADSHEET.getSheetByName("QUYỀN LỢI VIDEO (MỐC 17)");
-  if (!sheetQuyenLoi) {
-    sheetQuyenLoi = SPREADSHEET.insertSheet("QUYỀN LỢI VIDEO (MỐC 17)");
-    sheetQuyenLoi.appendRow(["Mã Học Viên", "Họ và Tên", "Khóa Học", "Mã Lớp", "Link Drive Video", "Tình Trạng", "Số Ngày Trễ Hạn", "Ngày Hoàn Thành"]);
-    sheetQuyenLoi.getRange(1, 1, 1, 8).setFontWeight("bold").setBackground("#B51225").setFontColor("#FFFFFF");
+  // 1. Tải dữ liệu từ hệ thống T.A Academy qua Supabase REST API
+  const options = {
+    method: "get",
+    headers: {
+      "apikey": SUPABASE_KEY,
+      "Authorization": "Bearer " + SUPABASE_KEY
+    },
+    muteHttpExceptions: true
+  };
+
+  const studentsRes = UrlFetchApp.fetch(SUPABASE_URL + "/rest/v1/students?select=*", options);
+  const classesRes = UrlFetchApp.fetch(SUPABASE_URL + "/rest/v1/classes?select=*", options);
+  const sessionsRes = UrlFetchApp.fetch(SUPABASE_URL + "/rest/v1/class_sessions?select=*", options);
+  const attendanceRes = UrlFetchApp.fetch(SUPABASE_URL + "/rest/v1/attendance_records?select=*", options);
+  const benefitsRes = UrlFetchApp.fetch(SUPABASE_URL + "/rest/v1/student_benefits?select=*", options);
+
+  const students = JSON.parse(studentsRes.getContentText()) || [];
+  const classes = JSON.parse(classesRes.getContentText()) || [];
+  const sessions = JSON.parse(sessionsRes.getContentText()) || [];
+  const attendance = JSON.parse(attendanceRes.getContentText()) || [];
+  const benefits = JSON.parse(benefitsRes.getContentText()) || [];
+
+  // Tìm số buổi tối đa (mặc định tối thiểu 16 buổi)
+  let maxSessions = 16;
+  students.forEach(function(s) {
+    if (s.total_registered_sessions && s.total_registered_sessions > maxSessions) {
+      maxSessions = Math.min(s.total_registered_sessions, 48);
+    }
+  });
+
+  sheet.clear();
+
+  // 2. Tạo Header theo đúng yêu cầu
+  const headerCols = ["STT", "HỌC VIÊN", "KHÓA HỌC", "MÃ LỚP", "BUỔI ĐĂNG KÝ"];
+  for (let b = 1; b <= maxSessions; b++) {
+    headerCols.push("Buổi " + b);
+  }
+  headerCols.push("QUYỀN LỢI (HOÀN THÀNH/ CHƯA HOÀN THÀNH)");
+  headerCols.push("SỐ BUỔI CÓ MẶT");
+  headerCols.push("SỐ BUỔI VẮNG");
+  headerCols.push("SỐ BUỔI CÒN LẠI");
+
+  // Dòng 1: Tiêu đề lớn
+  sheet.appendRow(["T.A ACADEMY — THEO DÕI ĐIỂM DANH & QUYỀN LỢI HỌC VIÊN (TỔNG HỢP TOÀN HỆ THỐNG)"]);
+  sheet.getRange(1, 1, 1, headerCols.length).merge().setFontWeight("bold").setFontSize(13).setBackground("#B51225").setFontColor("#FFFFFF").setHorizontalAlignment("center").setVerticalAlignment("middle");
+  sheet.setRowHeight(1, 40);
+
+  // Dòng 2: Header cột
+  sheet.appendRow(headerCols);
+  sheet.getRange(2, 1, 1, headerCols.length).setFontWeight("bold").setFontSize(10).setBackground("#2D3748").setFontColor("#FFFFFF").setHorizontalAlignment("center").setVerticalAlignment("middle").setWrap(true);
+  sheet.setRowHeight(2, 35);
+
+  if (students.length === 0) {
+    sheet.appendRow(["Chưa có dữ liệu học viên trong hệ thống"]);
+    sheet.getRange(3, 1, 1, headerCols.length).merge().setHorizontalAlignment("center");
+    return;
   }
 
-  SpreadsheetApp.getUi().alert("✅ Đã thiết lập cấu trúc đồng bộ tự động 2 chiều cho T.A Academy E-Learning thành công!");
+  // 3. Đổ dữ liệu từng học viên (1 học viên nằm trên 1 hàng)
+  const rows = [];
+  const bgColors = [];
+  const fontColors = [];
+  const fontWeights = [];
+
+  students.forEach(function(st, idx) {
+    const studentClass = classes.find(function(c) { return c.id === st.class_id || c.code === st.class_code; });
+    const studentSessions = sessions
+      .filter(function(sess) { return sess.class_id === st.class_id || (studentClass && sess.class_id === studentClass.id); })
+      .sort(function(a, b) { return a.session_number - b.session_number; });
+
+    const studentAtt = attendance.filter(function(a) { return a.student_id === st.id; });
+
+    let presentCount = 0;
+    let absentCount = 0;
+
+    const row = [
+      idx + 1,
+      (st.full_name || "").toUpperCase(),
+      (st.course_name || (studentClass ? studentClass.course_name : "MODEL KIDS")).toUpperCase(),
+      st.class_code || (studentClass ? studentClass.code : "K99"),
+      st.total_registered_sessions || (studentClass ? studentClass.total_sessions : 20)
+    ];
+
+    const rowBg = ["#FFFFFF", "#FFFFFF", "#FFFFFF", "#FFFFFF", "#FFFFFF"];
+    const rowFont = ["#333333", "#000000", "#333333", "#1A365D", "#333333"];
+    const rowWeight = ["normal", "bold", "normal", "bold", "normal"];
+
+    // Duyệt qua từng buổi từ Buổi 1 đến Buổi N
+    for (let b = 1; b <= maxSessions; b++) {
+      const sess = studentSessions.find(function(s) { return s.session_number === b; });
+      if (!sess) {
+        row.push("—");
+        rowBg.push("#FFFFFF");
+        rowFont.push("#A0AEC0");
+        rowWeight.push("normal");
+        continue;
+      }
+
+      const d = new Date(sess.session_date);
+      const dateStr = !isNaN(d.getTime()) ? (d.getDate() + "/" + (d.getMonth() + 1)) : sess.session_date;
+
+      const att = studentAtt.find(function(a) { return a.session_id === sess.id; });
+      if (att && att.status === "present") {
+        presentCount++;
+        row.push(dateStr);
+        rowBg.push("#E6F4EA"); // Xanh lá nhạt
+        rowFont.push("#137333"); // Chữ xanh lá đậm
+        rowWeight.push("bold");
+      } else if (att && att.status === "absent") {
+        absentCount++;
+        row.push("Vắng (" + dateStr + ")");
+        rowBg.push("#FCE8E6"); // Đỏ nhạt
+        rowFont.push("#C5221F"); // Chữ đỏ đậm
+        rowWeight.push("bold");
+      } else if (att && att.status === "late") {
+        presentCount++;
+        row.push("Muộn (" + dateStr + ")");
+        rowBg.push("#FEF7E0"); // Vàng nhạt
+        rowFont.push("#B06000");
+        rowWeight.push("bold");
+      } else {
+        row.push(dateStr);
+        rowBg.push("#F8F9FA");
+        rowFont.push("#4A5568");
+        rowWeight.push("normal");
+      }
+    }
+
+    // Cột QUYỀN LỢI (HOÀN THÀNH/ CHƯA HOÀN THÀNH)
+    const ben = benefits.find(function(b) {
+      return b.student_code === st.student_code || b.student_id === st.id || (b.student_name && b.student_name.toLowerCase() === st.full_name.toLowerCase());
+    });
+
+    const hasDriveLink = ben && ben.drive_link && ben.drive_link.trim() !== "";
+    const isCompleted = (ben && ben.status === "completed") || hasDriveLink;
+
+    if (isCompleted) {
+      if (hasDriveLink) {
+        row.push('=HYPERLINK("' + ben.drive_link + '"; "HOÀN THÀNH")');
+      } else {
+        row.push("HOÀN THÀNH");
+      }
+      rowBg.push("#E6F4EA"); // Màu xanh lá khi cô giáo đã gắn link drive
+      rowFont.push("#137333");
+      rowWeight.push("bold");
+    } else {
+      if (ben && ben.overdue_days && ben.overdue_days > 0) {
+        row.push("Trễ hạn " + ben.overdue_days + " ngày");
+      } else {
+        row.push("CHƯA HOÀN THÀNH");
+      }
+      rowBg.push("#FCE8E6"); // Màu đỏ khi chưa hoàn thành
+      rowFont.push("#C5221F");
+      rowWeight.push("bold");
+    }
+
+    // Các cột số liệu
+    const totalReg = st.total_registered_sessions || (studentClass ? studentClass.total_sessions : 20);
+    const remaining = Math.max(0, totalReg - presentCount);
+
+    row.push(presentCount);
+    rowBg.push("#E6F4EA");
+    rowFont.push("#137333");
+    rowWeight.push("bold");
+
+    row.push(absentCount);
+    rowBg.push(absentCount > 0 ? "#FCE8E6" : "#FFFFFF");
+    rowFont.push(absentCount > 0 ? "#C5221F" : "#333333");
+    rowWeight.push("bold");
+
+    row.push(remaining);
+    rowBg.push("#EDF2F7");
+    rowFont.push("#2D3748");
+    rowWeight.push("bold");
+
+    rows.push(row);
+    bgColors.push(rowBg);
+    fontColors.push(rowFont);
+    fontWeights.push(rowWeight);
+  });
+
+  const startRow = 3;
+  const numRows = rows.length;
+  const numCols = headerCols.length;
+
+  const dataRange = sheet.getRange(startRow, 1, numRows, numCols);
+  dataRange.setValues(rows);
+  dataRange.setBackgrounds(bgColors);
+  dataRange.setFontColors(fontColors);
+  dataRange.setFontWeights(fontWeights);
+  dataRange.setHorizontalAlignment("center").setVerticalAlignment("middle");
+  dataRange.setBorder(true, true, true, true, true, true, "#CBD5E0", SpreadsheetApp.BorderStyle.SOLID);
+
+  sheet.getRange(startRow, 2, numRows, 2).setHorizontalAlignment("left");
+  sheet.setFrozenRows(2);
+  sheet.setFrozenColumns(4);
+
+  for (let c = 1; c <= numCols; c++) {
+    sheet.autoResizeColumn(c);
+  }
+
+  SpreadsheetApp.getUi().alert("✅ Đã đồng bộ thành công " + students.length + " học viên vào bảng tính THEO DÕI ĐIỂM DANH & QUYỀN LỢI HỌC VIÊN!");
 }
 `;
 
@@ -755,39 +992,95 @@ function syncFromTAAcademy() {
               <FileSpreadsheet className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="font-extrabold text-sm text-gray-900">Đồng bộ tự động với Google Sheets</h3>
+              <h3 className="font-extrabold text-sm text-gray-900">
+                Đồng bộ Bảng tính THEO DÕI ĐIỂM DANH & QUYỀN LỢI HỌC VIÊN
+              </h3>
               <p className="text-xs text-gray-500">
-                Nhập link trang tính Google Sheet của bạn và kích hoạt đồng bộ tự động 2 chiều
+                Tự động tổng hợp học viên của tất cả các cô vào 1 bảng tính duy nhất trên Google Sheets
               </p>
             </div>
           </div>
 
-          <div className="space-y-4">
-            <div>
-              <label className="block text-xs font-bold text-gray-700 mb-1">
+          <div className="space-y-5">
+            {/* Tùy chọn 1: Xuất trực tiếp file Excel chuẩn Google Sheet */}
+            <div className="p-4 rounded-2xl bg-emerald-50/60 border border-emerald-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div>
+                <h4 className="font-bold text-xs text-emerald-950 flex items-center space-x-1.5">
+                  <Download className="w-4 h-4 text-emerald-700" />
+                  <span>Xuất File Excel Chuẩn Mẫu Google Sheet (.xlsx)</span>
+                </h4>
+                <p className="text-[11px] text-emerald-800 mt-0.5">
+                  Tải ngay bảng tính có sẵn các cột Buổi 1..Buổi N, Quyền lợi tô màu, Số buổi có mặt/vắng/còn lại để mở hoặc kéo thả vào Google Sheet.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleExportExcel}
+                className="inline-flex items-center space-x-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-md shadow-emerald-200 transition-colors shrink-0"
+              >
+                <Download className="w-4 h-4" />
+                <span>Tải File Excel (.xlsx)</span>
+              </button>
+            </div>
+
+            {/* Tùy chọn 2: Nhập link và kích hoạt đồng bộ tự động 2 chiều */}
+            <div className="space-y-2">
+              <label className="block text-xs font-bold text-gray-700">
                 Đường dẫn liên kết Google Spreadsheet của bạn
               </label>
-              <div className="flex items-center space-x-2">
+              <div className="flex flex-col sm:flex-row items-center gap-2">
                 <input
                   type="url"
                   value={sheetUrl}
                   onChange={(e) => setSheetUrl(e.target.value)}
                   placeholder="https://docs.google.com/spreadsheets/d/..."
-                  className="flex-1 px-3.5 py-2.5 text-xs bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                  className="w-full flex-1 px-3.5 py-2.5 text-xs bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500/20 font-mono"
                 />
-                <button
-                  type="button"
-                  onClick={() => {
-                    showToast('Đang kết nối và đồng bộ dữ liệu sang Google Sheet...');
-                    setTimeout(() => {
-                      showToast('Đồng bộ dữ liệu sang Google Sheet thành công!');
-                    }, 1200);
-                  }}
-                  className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-md shadow-emerald-200 transition-colors shrink-0"
-                >
-                  Đồng bộ ngay
-                </button>
+                <div className="flex items-center space-x-2 w-full sm:w-auto shrink-0">
+                  {sheetUrl && (
+                    <a
+                      href={sheetUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-xl transition-colors inline-flex items-center space-x-1"
+                    >
+                      <span>Mở Sheet</span>
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </a>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      showToast('Đang kết nối và đồng bộ dữ liệu sang Google Sheet...');
+                      setTimeout(() => {
+                        showToast('Đồng bộ dữ liệu sang Google Sheet thành công!');
+                      }, 1200);
+                    }}
+                    className="flex-1 sm:flex-none px-5 py-2.5 bg-brand-500 hover:bg-brand-600 text-white text-xs font-bold rounded-xl shadow-md shadow-red-200 transition-colors"
+                  >
+                    Đồng bộ ngay
+                  </button>
+                </div>
               </div>
+            </div>
+
+            {/* Quy tắc định dạng bảng tính */}
+            <div className="p-4 bg-gray-50 rounded-xl border border-gray-200 text-xs space-y-2">
+              <h4 className="font-bold text-gray-800">Quy chuẩn cấu trúc bảng tính tự động:</h4>
+              <ul className="text-gray-600 space-y-1 list-disc pl-4 text-[11px] leading-relaxed">
+                <li>
+                  <strong>Tên bảng tính tạo ra:</strong> <code className="text-brand-500 font-bold">THEO DÕI ĐIỂM DANH & QUYỀN LỢI HỌC VIÊN</code>
+                </li>
+                <li>
+                  <strong>Cấu trúc các cột:</strong> <span className="font-mono text-gray-800">STT - HỌC VIÊN - KHÓA HỌC - MÃ LỚP - BUỔI ĐĂNG KÝ - Buổi 1, Buổi 2... - QUYỀN LỢI - SỐ BUỔI CÓ MẶT - SỐ BUỔI VẮNG - SỐ BUỔI CÒN LẠI</span>
+                </li>
+                <li>
+                  <strong>Quy tắc Quyền lợi:</strong> Khi cô giáo đã gắn link Drive thì tự động ghi <span className="font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded">HOÀN THÀNH</span> (kèm link Drive và tô màu xanh). Nếu chưa cập nhật link, hệ thống tự động tính số ngày quá hạn và ghi <span className="font-bold text-red-700 bg-red-50 px-1.5 py-0.5 rounded">Trễ hạn X ngày</span> (tô màu đỏ).
+                </li>
+                <li>
+                  <strong>Tổng hợp toàn bộ:</strong> 1 học viên nằm trên 1 hàng, gộp tất cả học sinh của mọi giáo viên.
+                </li>
+              </ul>
             </div>
 
             {/* Khối cung cấp mã Script theo yêu cầu */}
@@ -795,7 +1088,7 @@ function syncFromTAAcademy() {
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2 text-xs font-bold text-amber-300">
                   <Code className="w-4 h-4" />
-                  <span>MÃ SCRIPT ĐỒNG BỘ GOOGLE APPS SCRIPT (APPS SCRIPT CODE)</span>
+                  <span>MÃ SCRIPT ĐỒNG BỘ GOOGLE APPS SCRIPT</span>
                 </div>
                 <button
                   onClick={copyScript}
@@ -807,10 +1100,10 @@ function syncFromTAAcademy() {
               </div>
 
               <p className="text-[11px] text-gray-300 leading-relaxed">
-                <strong>Hướng dẫn 3 bước:</strong> 1. Mở file Google Sheet của bạn &rarr; 2. Chọn menu <strong>Extensions (Tiện ích mở rộng) &rarr; Apps Script</strong> &rarr; 3. Dán toàn bộ đoạn mã bên dưới vào và nhấn <strong>Save & Run</strong>.
+                <strong>Hướng dẫn 3 bước:</strong> 1. Mở trang Google Sheet &rarr; 2. Chọn menu <strong>Extensions (Tiện ích mở rộng) &rarr; Apps Script</strong> &rarr; 3. Dán toàn bộ mã bên dưới vào, nhấn <strong>Save (Ctrl+S)</strong> và nhấn <strong>Run</strong> (hoặc chọn menu <strong>🚀 T.A ACADEMY</strong> trên thanh công cụ của Sheet).
               </p>
 
-              <pre className="p-3 bg-black/50 rounded-xl text-[11px] font-mono text-emerald-400 overflow-x-auto max-h-48 border border-gray-800">
+              <pre className="p-3 bg-black/50 rounded-xl text-[11px] font-mono text-emerald-400 overflow-x-auto max-h-56 border border-gray-800">
                 {googleAppsScriptCode}
               </pre>
             </div>

@@ -14,13 +14,15 @@ import {
   BookOpen,
   ShieldAlert,
   Lock,
+  Download,
 } from 'lucide-react';
 import { useApp } from '@/lib/store';
 import { AttendanceStatus, ClassSession } from '@/types';
 import { formatDate } from '@/lib/utils';
+import { exportAttendanceAndBenefitsToExcel } from '@/lib/exportUtils';
 
 export default function AttendancePortal() {
-  const { classes, students, intakeRecords, sessions, attendance, saveAttendance, currentUser, showToast } =
+  const { classes, students, intakeRecords, sessions, attendance, benefits, saveAttendance, currentUser, showToast } =
     useApp();
 
   const isStudent = currentUser.role === 'student';
@@ -398,6 +400,25 @@ export default function AttendancePortal() {
           >
             Hôm nay
           </button>
+          {!isStudent && (
+            <button
+              onClick={() => {
+                exportAttendanceAndBenefitsToExcel({
+                  students,
+                  classes,
+                  sessions,
+                  attendance,
+                  benefits,
+                });
+                showToast('Đã xuất file bảng theo dõi điểm danh & quyền lợi học viên!');
+              }}
+              className="inline-flex items-center space-x-1.5 px-3.5 py-2 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200 text-xs font-bold rounded-xl transition-colors shadow-2xs"
+              title="Xuất bảng THEO DÕI ĐIỂM DANH & QUYỀN LỢI HỌC VIÊN"
+            >
+              <Download className="w-4 h-4 text-emerald-700" />
+              <span>Xuất Sheet</span>
+            </button>
+          )}
         </div>
       </div>
 
