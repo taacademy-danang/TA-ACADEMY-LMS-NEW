@@ -170,6 +170,7 @@ export default function AdminSettings() {
     const teacher = profiles.find((p) => p.id === classForm.teacher_id);
     const calculatedEndTime = calculateClassEndTime(classForm.start_time, classForm.class_type);
     const generatedClassName = course ? `${classForm.code.trim()} – ${course.name}` : classForm.code.trim();
+    const classTotalSessions = course?.total_sessions || 16;
 
     if (editingClass) {
       editClass(editingClass.id, {
@@ -178,6 +179,7 @@ export default function AdminSettings() {
         course_name: course ? course.name : editingClass.course_name,
         teacher_name: teacher ? teacher.full_name : editingClass.teacher_name,
         end_time: calculatedEndTime,
+        total_sessions: classTotalSessions,
       });
       setEditingClass(null);
     } else {
@@ -187,6 +189,7 @@ export default function AdminSettings() {
         course_name: course ? course.name : 'Chưa xác định',
         teacher_name: teacher ? teacher.full_name : 'Chưa phân công',
         end_time: calculatedEndTime,
+        total_sessions: classTotalSessions,
       });
       setShowAddClassModal(false);
     }
@@ -655,7 +658,15 @@ function syncFromTAAcademy() {
                       <Edit2 className="w-4 h-4" />
                     </button>
                     <button
-                      onClick={() => deleteClass(cls.id)}
+                      onClick={() => {
+                        if (
+                          window.confirm(
+                            `Bạn có chắc chắn muốn xóa lớp học "${cls.code} – ${cls.name}"? Toàn bộ lịch học, điểm danh và bài tập của lớp này sẽ bị xóa hoàn toàn khỏi hệ thống.`
+                          )
+                        ) {
+                          deleteClass(cls.id);
+                        }
+                      }}
                       className="p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
                       title="Xóa lớp học"
                     >
@@ -935,12 +946,19 @@ function syncFromTAAcademy() {
                   </label>
                   <select
                     value={classForm.course_id}
-                    onChange={(e) => setClassForm({ ...classForm, course_id: e.target.value })}
+                    onChange={(e) => {
+                      const selectedCourse = courses.find((c) => c.id === e.target.value);
+                      setClassForm({
+                        ...classForm,
+                        course_id: e.target.value,
+                        total_sessions: selectedCourse?.total_sessions || 16,
+                      });
+                    }}
                     className="w-full px-3 py-2 text-xs bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 font-semibold"
                   >
                     {courses.map((c) => (
                       <option key={c.id} value={c.id}>
-                        {c.name}
+                        {c.code ? `${c.code} – ${c.name}` : c.name}
                       </option>
                     ))}
                   </select>
@@ -1021,7 +1039,7 @@ function syncFromTAAcademy() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-gray-700 mb-1">Ngày bắt đầu</label>
                   <input
@@ -1040,19 +1058,6 @@ function syncFromTAAcademy() {
                     required
                     value={classForm.start_time}
                     onChange={(e) => setClassForm({ ...classForm, start_time: e.target.value })}
-                    className="w-full px-3 py-2 text-xs bg-gray-50 border border-gray-200 rounded-xl"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1">Tổng số buổi</label>
-                  <input
-                    type="number"
-                    min="1"
-                    value={classForm.total_sessions}
-                    onChange={(e) =>
-                      setClassForm({ ...classForm, total_sessions: parseInt(e.target.value, 10) || 16 })
-                    }
                     className="w-full px-3 py-2 text-xs bg-gray-50 border border-gray-200 rounded-xl"
                   />
                 </div>

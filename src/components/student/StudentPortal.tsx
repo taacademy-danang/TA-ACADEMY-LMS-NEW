@@ -20,11 +20,14 @@ export default function StudentPortal() {
   const { students, assignments, submissions, submitHomework, evaluations, sessions, lessonPlans, currentUser, showToast } =
     useApp();
 
-  // Tìm hồ sơ học viên hiện tại
-  const student =
-    students.find(
-      (s) => s.phone === currentUser.phone || s.profile_id === currentUser.id
-    ) || students[0];
+  // Tìm hồ sơ học viên hiện tại chính xác theo Mã học viên, profile_id hoặc số điện thoại
+  const student = students.find(
+    (s) =>
+      (currentUser.student_code && s.student_code === currentUser.student_code) ||
+      s.profile_id === currentUser.id ||
+      (currentUser.phone && s.phone === currentUser.phone) ||
+      s.student_code === currentUser.username
+  );
 
   const [driveUrlInput, setDriveUrlInput] = useState('');
   const [showSubmitModal, setShowSubmitModal] = useState(false);

@@ -505,8 +505,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const deleteClass = (id: string) => {
     setClasses((prev) => prev.filter((c) => c.id !== id));
     setSessions((prev) => prev.filter((s) => s.class_id !== id));
+    setAssignments((prev) => prev.filter((a) => a.class_id !== id));
+    setAttendance((prev) => prev.filter((a) => a.class_id !== id));
+    setStudents((prev) =>
+      prev.map((s) =>
+        s.class_id === id
+          ? { ...s, class_id: undefined, class_code: undefined, class_name: undefined }
+          : s
+      )
+    );
     dbDeleteClass(id);
-    showToast('Đã xóa lớp học và lịch học tương ứng', 'info');
+    showToast('Đã xóa lớp học và lịch học tương ứng khỏi toàn bộ hệ thống', 'info');
   };
 
   const addSession = (sessionData: Omit<ClassSession, 'id' | 'status'>) => {

@@ -105,6 +105,15 @@ export async function dbUpdateClass(id: string, data: Partial<ClassItem>) {
 
 export async function dbDeleteClass(id: string) {
   if (!isSupabaseConfigured || !supabase) return;
+  // 1. Xóa toàn bộ lịch học liên quan đến lớp
+  await supabase.from('class_sessions').delete().eq('class_id', id);
+  // 2. Xóa bài tập về nhà liên quan
+  await supabase.from('assignments').delete().eq('class_id', id);
+  // 3. Xóa điểm danh liên quan
+  await supabase.from('attendance_records').delete().eq('class_id', id);
+  // 4. Gỡ bỏ thông tin lớp học khỏi học viên thuộc lớp này
+  await supabase.from('students').update({ class_id: null, class_code: null, class_name: null }).eq('class_id', id);
+  // 5. Xóa lớp học
   await supabase.from('classes').delete().eq('id', id);
 }
 

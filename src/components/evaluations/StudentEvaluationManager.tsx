@@ -45,11 +45,11 @@ export default function StudentEvaluationManager() {
   });
 
   const [selectedStudentId, setSelectedStudentId] = useState<string>(
-    displayStudents[0]?.id || students[0]?.id || ''
+    displayStudents[0]?.id || ''
   );
 
   const activeStudent =
-    displayStudents.find((s) => s.id === selectedStudentId) || displayStudents[0] || students[0];
+    displayStudents.find((s) => s.id === selectedStudentId) || displayStudents[0] || null;
 
   const studentEvaluations = evaluations.filter((e) => e.student_id === activeStudent?.id);
 
@@ -98,12 +98,17 @@ export default function StudentEvaluationManager() {
 
   // NẾU LÀ HỌC VIÊN: Xem đánh giá cá nhân (Read-only)
   if (isStudent) {
-    const myStudent =
-      students.find(
-        (s) => s.phone === currentUser.phone || s.profile_id === currentUser.id
-      ) || students[0];
+    const myStudent = students.find(
+      (s) =>
+        (currentUser.student_code && s.student_code === currentUser.student_code) ||
+        s.profile_id === currentUser.id ||
+        (currentUser.phone && s.phone === currentUser.phone) ||
+        s.student_code === currentUser.username
+    );
     const myEvals = evaluations.filter(
-      (e) => e.student_id === myStudent?.id || e.student_name === myStudent?.full_name
+      (e) =>
+        (myStudent?.id && e.student_id === myStudent.id) ||
+        (myStudent?.full_name && e.student_name === myStudent.full_name)
     );
 
     return (
