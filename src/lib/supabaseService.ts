@@ -253,7 +253,7 @@ export async function dbDeleteSession(id: string) {
 // ==========================================
 // THAO TÁC ĐIỂM DANH (ATTENDANCE)
 // ==========================================
-export async function dbSaveAttendance(records: AttendanceRecord[]) {
+export async function dbSaveAttendance(records: AttendanceRecord[], sessionData?: Partial<ClassSession>) {
   if (!isSupabaseConfigured || !supabase || records.length === 0) return;
   // Đảm bảo session_id tồn tại trên Supabase trước khi insert attendance
   const sessionId = records[0].session_id;
@@ -261,17 +261,46 @@ export async function dbSaveAttendance(records: AttendanceRecord[]) {
   if (sessionId) {
     const { data: existingSess } = await supabase.from('class_sessions').select('id').eq('id', sessionId).maybeSingle();
     if (!existingSess) {
-      await supabase.from('class_sessions').insert({
+      let clsName = sessionData?.class_name || 'Lớp đào tạo T.A';
+      let clsCode = sessionData?.class_code || '';
+      let crsName = sessionData?.course_name || '';
+      let teacherName = sessionData?.teacher_name || 'Khấu Thị Nga';
+      let startTime = sessionData?.start_time || '12:00';
+      let endTime = sessionData?.end_time || '13:30';
+      let room = sessionData?.room || 'Phòng Studio A1';
+      let sessionDate = sessionData?.session_date || new Date().toISOString().split('T')[0];
+      let dayOfWeek = sessionData?.day_of_week || 4;
+
+      if (classId) {
+        const { data: classRow } = await supabase.from('classes').select('*').eq('id', classId).maybeSingle();
+        if (classRow) {
+          clsName = classRow.name || clsName;
+          clsCode = classRow.code || clsCode;
+          crsName = classRow.course_name || crsName;
+          teacherName = classRow.teacher_name || teacherName;
+          startTime = classRow.start_time || startTime;
+          endTime = classRow.end_time || endTime;
+          room = classRow.room || room;
+        }
+      }
+
+      await supabase.from('class_sessions').upsert({
         id: sessionId,
         class_id: classId,
-        session_number: 1,
-        session_date: new Date().toISOString().split('T')[0],
-        day_of_week: 4,
-        start_time: '15:30',
-        end_time: '17:00',
-        teacher_name: 'Khấu Thị Nga',
+        class_name: clsName,
+        class_code: clsCode,
+        course_name: crsName,
+        session_number: sessionData?.session_number || 1,
+        session_date: sessionDate,
+        day_of_week: dayOfWeek,
+        start_time: startTime,
+        end_time: endTime,
+        teacher_name: teacherName,
+        room: room,
         status: 'completed',
       });
+    } else {
+      await supabase.from('class_sessions').update({ status: 'completed' }).eq('id', sessionId);
     }
   }
   await supabase.from('attendance_records').upsert(records, { onConflict: 'id' });

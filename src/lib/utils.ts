@@ -8,6 +8,10 @@ export function cn(...inputs: ClassValue[]) {
 
 export function formatDate(dateString: string): string {
   if (!dateString) return '';
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
+    const [y, m, d] = dateString.split('-');
+    return `${d}/${m}/${y}`;
+  }
   const date = new Date(dateString);
   if (isNaN(date.getTime())) return dateString;
   const day = String(date.getDate()).padStart(2, '0');

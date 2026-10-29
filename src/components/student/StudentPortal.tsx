@@ -222,21 +222,6 @@ export default function StudentPortal() {
             </p>
           </div>
         )}
-
-        {/* 2. Đánh giá buổi học riêng biệt (nhận xét về tinh thần, tác phong của buổi học trên lớp) */}
-        {teacherEvaluation?.content && (
-          <div className="p-4 rounded-xl bg-blue-50 border border-blue-200 space-y-2">
-            <div className="flex items-center space-x-2 text-blue-900 font-bold text-xs">
-              <Award className="w-4 h-4 text-blue-600" />
-              <span>
-                Đánh giá tinh thần & tác phong buổi học trên lớp ({teacherEvaluation.session_date ? `Ngày ${teacherEvaluation.session_date}` : 'Gần nhất'} - Cô {teacherEvaluation.created_by || 'Khấu Thị Nga'}):
-              </span>
-            </div>
-            <p className="text-xs text-blue-950 leading-relaxed font-semibold pl-6 italic">
-              &ldquo;{teacherEvaluation.content}&rdquo;
-            </p>
-          </div>
-        )}
       </div>
 
       {/* 3. Grid 4 card: Các bài tập về nhà trong khóa học chuẩn 100% Ảnh 3 */}

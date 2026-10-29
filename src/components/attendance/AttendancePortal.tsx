@@ -239,7 +239,7 @@ export default function AttendancePortal() {
       notes: notes[s.id] || '',
     }));
 
-    saveAttendance(sessionId, activeClass?.id || '', records);
+    saveAttendance(sessionId, activeClass?.id || '', records, activeSession || undefined);
   };
 
   const handleReset = () => {
@@ -256,15 +256,20 @@ export default function AttendancePortal() {
         (currentUser.student_code && s.student_code === currentUser.student_code) ||
         s.profile_id === currentUser.id ||
         (currentUser.phone && s.phone === currentUser.phone) ||
-        s.student_code === currentUser.username
+        s.student_code === currentUser.username ||
+        (currentUser.full_name && s.full_name?.trim().toLowerCase() === currentUser.full_name?.trim().toLowerCase())
     );
 
     const myAttendance = attendance.filter(
       (a) =>
         (myStudent?.id && a.student_id === myStudent.id) ||
-        (myStudent?.student_code && a.student_code === myStudent.student_code) ||
-        (myStudent?.full_name && a.student_name === myStudent.full_name) ||
-        (currentUser.student_code && a.student_code === currentUser.student_code)
+        (myStudent?.profile_id && a.student_id === myStudent.profile_id) ||
+        (myStudent?.student_code && (a.student_code === myStudent.student_code || a.student_id === myStudent.student_code)) ||
+        (myStudent?.full_name && a.student_name?.trim().toLowerCase() === myStudent.full_name?.trim().toLowerCase()) ||
+        (currentUser.student_code && (a.student_code === currentUser.student_code || a.student_id === currentUser.student_code)) ||
+        (currentUser.id && a.student_id === currentUser.id) ||
+        (currentUser.username && (a.student_code === currentUser.username || a.student_id === currentUser.username)) ||
+        (currentUser.full_name && a.student_name?.trim().toLowerCase() === currentUser.full_name?.trim().toLowerCase())
     );
 
     const presentRecords = myAttendance.filter((a) => a.status === 'present');
@@ -273,6 +278,38 @@ export default function AttendancePortal() {
     const absentCountStudent = Math.max(myStudent?.absent_sessions || 0, absentRecords.length);
     const totalRegistered = myStudent?.total_registered_sessions || 20;
     const remainingCount = Math.max(0, totalRegistered - completedCount);
+
+    // Danh sách hiển thị điểm danh: Ưu tiên myAttendance, nếu myAttendance trống mà myStudent đã có số buổi hoàn thành
+    const displayAttendance = (() => {
+      if (myAttendance.length > 0) {
+        return [...myAttendance].sort((a, b) => {
+          const dateA = sessions.find((s) => s.id === a.session_id)?.session_date || a.marked_at || '';
+          const dateB = sessions.find((s) => s.id === b.session_id)?.session_date || b.marked_at || '';
+          return dateA.localeCompare(dateB);
+        });
+      }
+      if (myStudent && myStudent.completed_sessions > 0) {
+        const classSessions = sessions.filter(
+          (s) =>
+            (s.class_id === myStudent.class_id || (myStudent.class_code && s.class_code === myStudent.class_code)) &&
+            s.status === 'completed'
+        );
+        if (classSessions.length > 0) {
+          return classSessions.map((s, idx) => ({
+            id: `fb-${s.id}-${myStudent.id}`,
+            session_id: s.id,
+            class_id: s.class_id,
+            student_id: myStudent.id,
+            student_name: myStudent.full_name,
+            student_code: myStudent.student_code,
+            status: 'present' as AttendanceStatus,
+            notes: 'Đã hoàn thành buổi học trên lớp',
+            marked_at: s.session_date ? `${s.session_date}T00:00:00Z` : new Date().toISOString(),
+          }));
+        }
+      }
+      return [];
+    })();
 
     return (
       <div className="space-y-6">
@@ -319,20 +356,29 @@ export default function AttendancePortal() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 font-medium">
-              {myAttendance.length === 0 ? (
+              {displayAttendance.length === 0 ? (
                 <tr>
                   <td colSpan={4} className="py-8 text-center text-gray-400 font-medium">
                     Chưa có buổi học nào được ghi nhận điểm danh.
                   </td>
                 </tr>
               ) : (
-                myAttendance.map((rec, idx) => {
-                  const sessDate = sessions.find((s) => s.id === rec.session_id)?.session_date;
+                displayAttendance.map((rec, idx) => {
+                  const sess = sessions.find((s) => s.id === rec.session_id);
+                  const sessDate = sess?.session_date || (rec as any).session_date;
                   const dateDisplay = sessDate ? formatDate(sessDate) : (rec.marked_at ? formatDate(rec.marked_at) : '—');
+                  const sessionNum = sess?.session_number || idx + 1;
                   return (
                     <tr key={rec.id || idx} className="hover:bg-gray-50/50">
-                      <td className="py-3.5 px-4 font-bold text-gray-900">{dateDisplay}</td>
-                      <td className="py-3.5 px-4 text-gray-700">{myStudent?.class_name || myStudent?.class_code || 'Lớp đào tạo T.A'}</td>
+                      <td className="py-3.5 px-4 font-bold text-gray-900">
+                        <div className="flex items-center space-x-2">
+                          <span className="px-2 py-0.5 rounded bg-blue-50 text-blue-700 font-bold text-[11px]">
+                            Buổi {sessionNum}
+                          </span>
+                          <span>{dateDisplay}</span>
+                        </div>
+                      </td>
+                      <td className="py-3.5 px-4 text-gray-700">{sess?.class_name || myStudent?.class_name || myStudent?.class_code || 'Lớp đào tạo T.A'}</td>
                       <td className="py-3.5 px-4 text-center">
                         {rec.status === 'present' && (
                           <span className="px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 font-bold text-[11px]">

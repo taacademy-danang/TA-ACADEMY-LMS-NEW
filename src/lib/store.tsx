@@ -112,7 +112,8 @@ interface AppContextType {
   saveAttendance: (
     sessionId: string,
     classId: string,
-    records: { student_id: string; student_name: string; student_code: string; status: AttendanceStatus; notes?: string }[]
+    records: { student_id: string; student_name: string; student_code: string; status: AttendanceStatus; notes?: string }[],
+    sessionInfo?: Partial<ClassSession>
   ) => void;
 
   // Evaluation workflow
@@ -612,11 +613,34 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const saveAttendance = (
     sessionId: string,
     classId: string,
-    records: { student_id: string; student_name: string; student_code: string; status: AttendanceStatus; notes?: string }[]
+    records: { student_id: string; student_name: string; student_code: string; status: AttendanceStatus; notes?: string }[],
+    sessionInfo?: Partial<ClassSession>
   ) => {
-    setSessions((prev) =>
-      prev.map((s) => (s.id === sessionId ? { ...s, status: 'completed' } : s))
-    );
+    const classObj = classes.find((c) => c.id === classId);
+    setSessions((prev) => {
+      const exists = prev.some((s) => s.id === sessionId);
+      if (exists) {
+        return prev.map((s) => (s.id === sessionId ? { ...s, status: 'completed' } : s));
+      }
+      const newSess: ClassSession = {
+        id: sessionId,
+        class_id: classId,
+        class_name: sessionInfo?.class_name || classObj?.name || 'Lớp đào tạo T.A',
+        class_code: sessionInfo?.class_code || classObj?.code || '',
+        course_name: sessionInfo?.course_name || classObj?.course_name || '',
+        session_type: (sessionInfo?.session_type as any) || (classObj?.class_type === 'one_on_one' ? 'private' : 'group'),
+        session_number: sessionInfo?.session_number || 1,
+        session_date: sessionInfo?.session_date || new Date().toISOString().split('T')[0],
+        day_of_week: sessionInfo?.day_of_week || 4,
+        start_time: sessionInfo?.start_time || classObj?.start_time || '12:00',
+        end_time: sessionInfo?.end_time || classObj?.end_time || '13:30',
+        teacher_id: sessionInfo?.teacher_id || classObj?.teacher_id || 'p-gv-01',
+        teacher_name: sessionInfo?.teacher_name || classObj?.teacher_name || 'Khấu Thị Nga',
+        room: sessionInfo?.room || classObj?.room || 'Phòng Studio A1',
+        status: 'completed',
+      };
+      return [...prev, newSess];
+    });
 
     const newAttendanceList: AttendanceRecord[] = records.map((item) => ({
       id: `att-${sessionId}-${item.student_id}`,
@@ -636,7 +660,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       return [...filtered, ...newAttendanceList];
     });
 
-    dbSaveAttendance(newAttendanceList);
+    dbSaveAttendance(newAttendanceList, sessionInfo);
 
     records.forEach((rec) => {
       const studentObj = students.find((s) => s.id === rec.student_id);
