@@ -9,8 +9,9 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  width: 'device-width',
-  initialScale: 1,
+  width: 1200,
+  initialScale: 0.35,
+  minimumScale: 0.2,
   maximumScale: 5,
   userScalable: true,
 };
@@ -23,6 +24,7 @@ export default function RootLayout({
   return (
     <html lang="vi">
       <head>
+        <meta name="viewport" content="width=1200, initial-scale=0.35, minimum-scale=0.2, maximum-scale=5.0, user-scalable=yes" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link

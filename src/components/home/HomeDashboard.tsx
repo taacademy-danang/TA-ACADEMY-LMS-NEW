@@ -89,8 +89,8 @@ export default function HomeDashboard() {
         <div className="absolute right-4 -bottom-10 w-64 h-64 bg-white/10 rounded-full blur-2xl pointer-events-none"></div>
       </div>
 
-      {/* 4 Introduction Cards: Di chuyển ảnh lên trên để thấy toàn bộ nhân vật & bỏ các chữ màu xám */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* 4 Introduction Cards: Hiển thị 4 cột chuẩn như máy tính */}
+      <div className="grid grid-cols-4 gap-4">
         {introCards.map((card, i) => (
           <div
             key={i}

@@ -235,7 +235,7 @@ export default function StudentPortal() {
           </span>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-4 gap-4">
           {/* Card Buổi 1: Đang mở */}
           <div className="p-4 rounded-2xl border border-emerald-200 bg-white shadow-xs space-y-3 flex flex-col justify-between">
             <div className="space-y-2">

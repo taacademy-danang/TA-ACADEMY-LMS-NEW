@@ -35,31 +35,16 @@ export default function Navbar({ onOpenMobileMenu }: NavbarProps) {
   };
 
   return (
-    <header className="h-16 bg-white border-b border-gray-200 px-4 sm:px-6 flex items-center justify-between sticky top-0 z-30 shadow-xs">
-      {/* Mobile Hamburger & Brand Title */}
+    <header className="h-16 bg-white border-b border-gray-200 px-6 flex items-center justify-between sticky top-0 z-30 shadow-xs">
+      {/* Brand Title */}
       <div className="flex items-center space-x-3">
-        <button
-          onClick={onOpenMobileMenu}
-          className="p-2 -ml-1 text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-xl md:hidden transition-colors"
-          aria-label="Mở menu điều hướng"
-        >
-          <Menu className="w-5 h-5 text-gray-700" />
-        </button>
-
-        <div className="flex items-center space-x-2 md:hidden">
-          <div className="w-8 h-8 rounded-lg bg-brand-500 text-white flex items-center justify-center font-extrabold text-xs shadow-xs">
-            TA
-          </div>
-          <span className="font-extrabold text-gray-900 text-sm tracking-tight">T.A ACADEMY</span>
-        </div>
-
-        <span className="text-xs font-bold tracking-wider text-gray-500 uppercase hidden md:inline">
+        <span className="text-xs font-bold tracking-wider text-gray-500 uppercase">
           T.A ACADEMY - HỆ THỐNG ĐÀO TẠO ELEARNING
         </span>
       </div>
 
       {/* User Info & Menu */}
-      <div className="flex items-center space-x-2 sm:space-x-3">
+      <div className="flex items-center space-x-3">
         <button className="relative p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-colors">
           <Bell className="w-5 h-5" />
           <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-brand-500 rounded-full"></span>
@@ -68,16 +53,16 @@ export default function Navbar({ onOpenMobileMenu }: NavbarProps) {
         <div className="relative">
           <button
             onClick={() => setDropdownOpen(!dropdownOpen)}
-            className="flex items-center space-x-2 sm:space-x-3 pl-2 pr-1 py-1 rounded-full hover:bg-gray-50 transition-colors border border-transparent hover:border-gray-200"
+            className="flex items-center space-x-3 pl-2 pr-1 py-1 rounded-full hover:bg-gray-50 transition-colors border border-transparent hover:border-gray-200"
           >
-            <div className="text-right hidden sm:block">
+            <div className="text-right">
               <div className="text-sm font-bold text-gray-800 leading-none">{currentUser.full_name}</div>
               <div className="mt-1 flex justify-end">{getRoleBadge(currentUser.role)}</div>
             </div>
             <div className="w-9 h-9 rounded-full bg-brand-500 text-white flex items-center justify-center font-bold text-sm shadow-sm">
               {getInitials(currentUser.full_name)}
             </div>
-            <ChevronDown className="w-4 h-4 text-gray-400 hidden sm:block" />
+            <ChevronDown className="w-4 h-4 text-gray-400" />
           </button>
 
           {dropdownOpen && (
@@ -86,7 +71,7 @@ export default function Navbar({ onOpenMobileMenu }: NavbarProps) {
                 <p className="text-[10px] text-gray-400 uppercase font-bold">Tài khoản hiện tại</p>
                 <div className="flex items-center justify-between mt-0.5">
                   <p className="text-sm font-extrabold text-gray-900">{currentUser.full_name}</p>
-                  <div className="sm:hidden">{getRoleBadge(currentUser.role)}</div>
+                  <div>{getRoleBadge(currentUser.role)}</div>
                 </div>
                 <p className="text-xs text-gray-500 font-mono mt-0.5">
                   {currentUser.username || currentUser.phone}

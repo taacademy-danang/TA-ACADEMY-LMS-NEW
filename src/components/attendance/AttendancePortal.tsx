@@ -481,9 +481,9 @@ export default function AttendancePortal() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* Left Column: Danh sách lớp học CÓ LỊCH VÀO NGÀY ĐÃ CHỌN */}
-        <div className="lg:col-span-4 space-y-3">
+      <div className="grid grid-cols-12 gap-6 items-start">
+        {/* Left Column: Danh sách lớp học CÓ LỊCH VÀO NGÀY ĐÃ CHỌN chuẩn như máy tính */}
+        <div className="col-span-4 space-y-3">
           <div className="flex items-center justify-between px-1">
             <div className="flex items-center space-x-2 text-xs font-bold text-gray-800">
               <BookOpen className="w-4 h-4 text-brand-500" />
@@ -569,7 +569,7 @@ export default function AttendancePortal() {
 
         {/* Right Column: Bảng chi tiết điểm danh */}
         {dateSessions.length === 0 ? (
-          <div className="lg:col-span-8 bg-white rounded-2xl border border-gray-200 p-12 text-center shadow-sm space-y-3">
+          <div className="col-span-8 bg-white rounded-2xl border border-gray-200 p-12 text-center shadow-sm space-y-3">
             <Calendar className="w-12 h-12 text-gray-300 mx-auto" />
             <h3 className="text-base font-extrabold text-gray-900">
               Không có lớp học cần điểm danh trong ngày {formatDate(selectedDate)}
@@ -579,7 +579,7 @@ export default function AttendancePortal() {
             </p>
           </div>
         ) : (
-          <div className="lg:col-span-8 bg-white rounded-2xl border border-gray-200 p-6 shadow-sm space-y-6">
+          <div className="col-span-8 bg-white rounded-2xl border border-gray-200 p-6 shadow-sm space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-5 border-b border-gray-100 gap-3">
               <div>
                 <div className="flex items-center space-x-3">
