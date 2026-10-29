@@ -447,23 +447,36 @@ export default function AttendancePortal() {
             Hôm nay
           </button>
           {!isStudent && (
-            <button
-              onClick={() => {
-                exportAttendanceAndBenefitsToExcel({
-                  students,
-                  classes,
-                  sessions,
-                  attendance,
-                  benefits,
-                });
-                showToast('Đã xuất file bảng theo dõi điểm danh & quyền lợi học viên!');
-              }}
-              className="inline-flex items-center space-x-1.5 px-3.5 py-2 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200 text-xs font-bold rounded-xl transition-colors shadow-2xs"
-              title="Xuất bảng THEO DÕI ĐIỂM DANH & QUYỀN LỢI HỌC VIÊN"
-            >
-              <Download className="w-4 h-4 text-emerald-700" />
-              <span>Xuất Sheet</span>
-            </button>
+            <>
+              <button
+                onClick={() => {
+                  exportAttendanceAndBenefitsToExcel({
+                    students,
+                    classes,
+                    sessions,
+                    attendance,
+                    benefits,
+                  });
+                  showToast('Đã xuất file Excel bảng theo dõi điểm danh & quyền lợi học viên!');
+                }}
+                className="inline-flex items-center space-x-1.5 px-3 py-2 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200 text-xs font-bold rounded-xl transition-colors shadow-2xs"
+                title="Tải file Excel THEO DÕI ĐIỂM DANH & QUYỀN LỢI HỌC VIÊN"
+              >
+                <Download className="w-4 h-4 text-emerald-700" />
+                <span>Tải File Excel</span>
+              </button>
+
+              <a
+                href="https://docs.google.com/spreadsheets/d/1jE3A0xuSpidl6J6AkXDWKvs8e2_4iFGwZbyk6cC4tXY/edit"
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center space-x-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-colors shadow-xs"
+                title="Mở Google Sheet THEO DÕI ĐIỂM DANH & QUYỀN LỢI HỌC VIÊN"
+              >
+                <ExternalLink className="w-4 h-4 text-white" />
+                <span>Mở Google Sheet</span>
+              </a>
+            </>
           )}
         </div>
       </div>

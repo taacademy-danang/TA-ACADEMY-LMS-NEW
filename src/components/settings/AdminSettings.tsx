@@ -71,7 +71,7 @@ export default function AdminSettings() {
   const [editingClass, setEditingClass] = useState<ClassItem | null>(null);
 
   // Google Sheet Sync & Script Modal
-  const [sheetUrl, setSheetUrl] = useState('https://docs.google.com/spreadsheets/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/edit');
+  const [sheetUrl, setSheetUrl] = useState('https://docs.google.com/spreadsheets/d/1jE3A0xuSpidl6J6AkXDWKvs8e2_4iFGwZbyk6cC4tXY/edit');
   const [showScriptModal, setShowScriptModal] = useState(false);
   const [scriptCopied, setScriptCopied] = useState(false);
 
@@ -272,12 +272,40 @@ function dongBoDiemDanhQuyenLoi() {
   const sessionsRes = UrlFetchApp.fetch(SUPABASE_URL + "/rest/v1/class_sessions?select=*", options);
   const attendanceRes = UrlFetchApp.fetch(SUPABASE_URL + "/rest/v1/attendance_records?select=*", options);
   const benefitsRes = UrlFetchApp.fetch(SUPABASE_URL + "/rest/v1/student_benefits?select=*", options);
+  const intakesRes = UrlFetchApp.fetch(SUPABASE_URL + "/rest/v1/intake_records?select=*", options);
 
   const students = JSON.parse(studentsRes.getContentText()) || [];
   const classes = JSON.parse(classesRes.getContentText()) || [];
   const sessions = JSON.parse(sessionsRes.getContentText()) || [];
   const attendance = JSON.parse(attendanceRes.getContentText()) || [];
   const benefits = JSON.parse(benefitsRes.getContentText()) || [];
+  const intakes = JSON.parse(intakesRes.getContentText()) || [];
+
+  // Tổng hợp tất cả học viên đã được xếp lớp
+  intakes.forEach(function(r) {
+    if (r.assigned_class_id || r.assigned_class_code) {
+      const exists = students.some(function(s) {
+        return (s.phone && s.phone === r.phone) || (s.full_name && s.full_name.trim().toLowerCase() === r.full_name.trim().toLowerCase());
+      });
+      if (!exists) {
+        students.push({
+          id: "intake-" + r.id,
+          full_name: r.full_name,
+          phone: r.phone,
+          student_code: r.student_code || "Chờ cấp mã",
+          course_id: r.course_id,
+          course_name: r.course_name,
+          class_id: r.assigned_class_id || "",
+          class_code: r.assigned_class_code || "",
+          class_name: r.assigned_class_name || "",
+          total_registered_sessions: r.total_sessions || 20,
+          completed_sessions: 0,
+          remaining_sessions: r.total_sessions || 20,
+          absent_sessions: 0,
+        });
+      }
+    }
+  });
 
   // Tìm số buổi tối đa (mặc định tối thiểu 16 buổi)
   let maxSessions = 16;
@@ -395,7 +423,7 @@ function dongBoDiemDanhQuyenLoi() {
 
     if (isCompleted) {
       if (hasDriveLink) {
-        row.push('=HYPERLINK("' + ben.drive_link + '"; "HOÀN THÀNH")');
+        row.push('=HYPERLINK("' + ben.drive_link + '", "HOÀN THÀNH")');
       } else {
         row.push("HOÀN THÀNH");
       }
