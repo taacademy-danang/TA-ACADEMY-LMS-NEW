@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import { AppProvider } from '@/lib/store';
 import ToastContainer from '@/components/ui/ToastContainer';
@@ -6,6 +6,13 @@ import ToastContainer from '@/components/ui/ToastContainer';
 export const metadata: Metadata = {
   title: 'T.A Academy — Hệ Thống Đào Tạo E-Learning & LMS',
   description: 'Hệ thống Quản lý Đào tạo, Xếp lớp, Điểm danh, Đánh giá và Bài tập T.A Academy',
+};
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 5,
+  userScalable: true,
 };
 
 export default function RootLayout({

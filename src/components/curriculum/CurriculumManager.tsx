@@ -389,7 +389,7 @@ export default function CurriculumManager() {
         </div>
 
         {/* Course switcher */}
-        <div className="flex items-center space-x-1.5 bg-white p-1 rounded-xl border border-gray-200 shadow-2xs">
+        <div className="flex items-center space-x-1.5 bg-white p-1 rounded-xl border border-gray-200 shadow-2xs overflow-x-auto max-w-full">
           {courses.map((c) => (
             <button
               key={c.id}

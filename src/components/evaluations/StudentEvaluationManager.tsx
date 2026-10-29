@@ -348,7 +348,7 @@ export default function StudentEvaluationManager() {
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Panel Trái — Danh sách học viên */}
-        <div className="lg:col-span-4 bg-white rounded-2xl border border-gray-200 p-5 shadow-sm space-y-4">
+        <div className="lg:col-span-4 bg-white rounded-2xl border border-gray-200 p-4 sm:p-5 shadow-sm space-y-4">
           <div className="flex items-center justify-between pb-3 border-b border-gray-100">
             <div>
               <h2 className="text-sm font-extrabold text-gray-900">Danh sách học viên</h2>
@@ -475,7 +475,7 @@ export default function StudentEvaluationManager() {
         </div>
 
         {/* Panel Phải — Đánh giá chi tiết */}
-        <div className="lg:col-span-8 bg-white rounded-2xl border border-gray-200 p-6 shadow-sm space-y-6">
+        <div className="lg:col-span-8 bg-white rounded-2xl border border-gray-200 p-4 sm:p-6 shadow-sm space-y-6">
           {/* Header học viên & 3 Tabs */}
           <div className="pb-4 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
@@ -654,7 +654,7 @@ export default function StudentEvaluationManager() {
               </div>
 
               {/* Buttons: Hủy và Lưu đánh giá */}
-              <div className="pt-2 flex items-center justify-between">
+              <div className="pt-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <p className="text-[11px] text-emerald-700 font-medium">
                   * Khi lưu đánh giá, hệ thống sẽ tự động cập nhật trạng thái <strong>&ldquo;Đã điểm danh (Có mặt)&rdquo;</strong> cho học viên.
                 </p>

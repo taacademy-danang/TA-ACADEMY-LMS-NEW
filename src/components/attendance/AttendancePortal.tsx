@@ -427,7 +427,7 @@ export default function AttendancePortal() {
         </div>
 
         {/* Date Selector */}
-        <div className="flex items-center space-x-2.5">
+        <div className="flex flex-wrap items-center gap-2">
           <div className="flex items-center space-x-2 px-3.5 py-2 bg-white border border-gray-200 rounded-xl shadow-xs">
             <Calendar className="w-4 h-4 text-gray-400 shrink-0" />
             <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">

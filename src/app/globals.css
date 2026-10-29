@@ -46,6 +46,24 @@ body {
   }
 }
 
+@keyframes slideRight {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
 .animate-slide-down {
   animation: slideDown 0.2s ease-out forwards;
+}
+
+.animate-slide-right {
+  animation: slideRight 0.25s ease-out forwards;
+}
+
+/* Safe area for modern phones (iPhone home indicator) */
+.safe-area-pb {
+  padding-bottom: max(0.25rem, env(safe-area-inset-bottom));
 }
