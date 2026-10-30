@@ -18,7 +18,7 @@ import {
 import { useApp } from '@/lib/store';
 
 export default function TeacherHomeworkManager() {
-  const { classes, sessions, assignments, submissions, students, currentUser, saveHomeworkFeedback, showToast } =
+  const { classes, sessions, assignments, submissions, students, lessonPlans, currentUser, saveHomeworkFeedback, showToast } =
     useApp();
 
   const isTeacher = currentUser.role === 'teacher';
@@ -64,20 +64,32 @@ export default function TeacherHomeworkManager() {
       teacher_name: selectedClass?.teacher_name || 'Khấu Thị Nga',
     };
 
+  // Tìm bài học & bài tập tương ứng trong giáo án đã cập nhật
+  const currentPlan = lessonPlans.find(
+    (lp) =>
+      ((selectedClass?.course_id && lp.course_id === selectedClass.course_id) ||
+        (selectedClass?.course_name && lp.course_name?.toLowerCase() === selectedClass.course_name.toLowerCase()) ||
+        (selectedClass?.name && lp.course_name && selectedClass.name.includes(lp.course_name)) ||
+        lp.course_id === 'c-1793240838312') &&
+      lp.session_number === selectedSessionNumber
+  );
+
   // Bài tập của buổi này
   const activeAssignment = assignments.find(
     (a) => a.session_number === selectedSessionNumber && (a.class_id === selectedClass?.id || !a.class_id)
   ) || {
-    id: `asg-${selectedSessionNumber}`,
+    id: currentPlan ? `asg-${currentPlan.course_id}-${selectedSessionNumber}` : `asg-${selectedSessionNumber}`,
     class_id: selectedClass?.id || '',
     session_number: selectedSessionNumber,
-    title: 'Dáng đứng thẳng tựa tường định vị trục sống lưng',
-    description: 'Học viên quay video 3 phút đứng tự thế và nộp qua link Google Drive.',
-    requirements: [
-      'Trang phục chỉnh tề, ôm sát dáng người để quan sát rõ trục cơ thể.',
-      'Góc máy quay ngang toàn thân, đủ ánh sáng.',
-      'Giữ tư thế 3 phút thẳng đứng, mắt nhìn thẳng tự tin.',
-    ],
+    title: currentPlan?.homework_title || currentPlan?.title || `Bài tập buổi ${selectedSessionNumber}`,
+    description: currentPlan?.homework_desc || currentPlan?.content || 'Học viên thực hành và nộp qua link Google Drive.',
+    requirements: currentPlan?.homework_desc
+      ? currentPlan.homework_desc.split(/\r?\n/).filter((l) => l.trim().length > 0)
+      : [
+          'Trang phục chỉnh tề, ôm sát dáng người để quan sát rõ trục cơ thể.',
+          'Góc máy quay ngang toàn thân, đủ ánh sáng.',
+          'Giữ tư thế 3 phút thẳng đứng, mắt nhìn thẳng tự tin.',
+        ],
     due_date: '2026-10-30',
     is_unlocked: true,
     created_at: new Date().toISOString(),
