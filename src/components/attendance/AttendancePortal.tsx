@@ -81,23 +81,32 @@ export default function AttendancePortal() {
         }
         return true;
       })
-      .map((c) => ({
-        id: `sess-${c.id}-${selectedDate}`,
-        class_id: c.id,
-        class_code: c.code,
-        class_name: c.name,
-        course_name: c.course_name,
-        session_type: c.class_type === 'one_on_one' ? ('private' as const) : ('group' as const),
-        session_number: 1,
-        session_date: selectedDate,
-        day_of_week: selectedDayOfWeek,
-        start_time: c.start_time,
-        end_time: c.end_time,
-        teacher_id: c.teacher_id,
-        teacher_name: c.teacher_name,
-        room: c.room || 'Phòng Studio A1',
-        status: 'scheduled' as const,
-      }));
+      .map((c) => {
+        const priorSessions = sessions.filter(
+          (s) =>
+            (s.class_id === c.id || s.class_code === c.code) &&
+            s.session_date < selectedDate &&
+            s.status !== 'cancelled'
+        );
+        const sessionNumber = priorSessions.length + 1;
+        return {
+          id: `sess-${c.id}-${selectedDate}`,
+          class_id: c.id,
+          class_code: c.code,
+          class_name: c.name,
+          course_name: c.course_name,
+          session_type: c.class_type === 'one_on_one' ? ('private' as const) : ('group' as const),
+          session_number: sessionNumber,
+          session_date: selectedDate,
+          day_of_week: selectedDayOfWeek,
+          start_time: c.start_time,
+          end_time: c.end_time,
+          teacher_id: c.teacher_id,
+          teacher_name: c.teacher_name,
+          room: c.room || 'Phòng Studio A1',
+          status: 'scheduled' as const,
+        };
+      });
 
     // Gộp và loại trừ trùng lặp theo class_id
     const combinedMap = new Map<string, ClassSession>();

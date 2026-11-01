@@ -694,25 +694,41 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       return [...prev, newSess];
     });
 
-    const newAttendanceList: AttendanceRecord[] = records.map((item) => ({
-      id: `att-${sessionId}-${item.student_id}`,
-      session_id: sessionId,
-      class_id: classId,
-      student_id: item.student_id,
-      student_name: item.student_name,
-      student_code: item.student_code,
-      status: item.status,
-      notes: item.notes,
-      marked_at: new Date().toISOString(),
-      marked_by: currentUser.id,
-    }));
+    const markedAttendanceList: AttendanceRecord[] = records
+      .filter((item) => item.status && item.status !== 'unmarked')
+      .map((item) => ({
+        id: `att-${sessionId}-${item.student_id}`,
+        session_id: sessionId,
+        class_id: classId,
+        student_id: item.student_id,
+        student_name: item.student_name,
+        student_code: item.student_code,
+        status: item.status,
+        notes: item.notes,
+        marked_at: new Date().toISOString(),
+        marked_by: currentUser.id,
+      }));
 
     setAttendance((prev) => {
       const filtered = prev.filter((r) => r.session_id !== sessionId);
-      return [...filtered, ...newAttendanceList];
+      return [...filtered, ...markedAttendanceList];
     });
 
-    dbSaveAttendance(newAttendanceList, sessionInfo);
+    dbSaveAttendance(
+      records.map((item) => ({
+        id: `att-${sessionId}-${item.student_id}`,
+        session_id: sessionId,
+        class_id: classId,
+        student_id: item.student_id,
+        student_name: item.student_name,
+        student_code: item.student_code,
+        status: item.status,
+        notes: item.notes,
+        marked_at: new Date().toISOString(),
+        marked_by: currentUser.id,
+      })),
+      sessionInfo
+    );
 
     records.forEach((rec) => {
       const studentObj = students.find((s) => s.id === rec.student_id);

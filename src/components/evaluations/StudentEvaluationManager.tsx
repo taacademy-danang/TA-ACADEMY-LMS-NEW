@@ -71,11 +71,25 @@ export default function StudentEvaluationManager() {
   // Các lớp học có lịch học vào đúng ngày sessionDate đã chọn
   const activeClassesOnDate = useMemo(() => {
     return teacherClasses.filter((c) => {
-      // 1. Có buổi học trùng ngày trong sessions
-      const hasDirectSession = sessions.some((s) => s.class_id === c.id && s.session_date === sessionDate);
+      // 1. Nếu buổi học ngày này đã bị HỦY trong sessions, không hiện lớp này
+      const isCancelled = sessions.some(
+        (s) =>
+          (s.class_id === c.id || s.class_code === c.code) &&
+          s.session_date === sessionDate &&
+          s.status === 'cancelled'
+      );
+      if (isCancelled) return false;
+
+      // 2. Có buổi học thực tế trùng ngày trong sessions (và chưa bị hủy)
+      const hasDirectSession = sessions.some(
+        (s) =>
+          (s.class_id === c.id || s.class_code === c.code) &&
+          s.session_date === sessionDate &&
+          s.status !== 'cancelled'
+      );
       if (hasDirectSession) return true;
 
-      // 2. Khớp theo thứ trong tuần và khoảng thời gian lớp diễn ra
+      // 3. Khớp theo thứ trong tuần và khoảng thời gian lớp diễn ra
       const matchesDay = c.days_of_week?.includes(selectedDayOfWeek);
       const matchesDateRange = (!c.start_date || c.start_date <= sessionDate) && (!c.end_date || c.end_date >= sessionDate);
       return matchesDay && matchesDateRange;
@@ -135,15 +149,22 @@ export default function StudentEvaluationManager() {
         (st.class_id && activeClassIds.has(st.class_id)) ||
         (st.class_code && activeClassCodes.has(st.class_code));
 
-      // 2. Hoặc học viên đã có đánh giá hoặc điểm danh vào đúng ngày này
+      // 2. Hoặc học viên đã có đánh giá vào đúng ngày này
       const hasEvalOnDate = evaluations.some(
         (e) => (e.student_id === st.id || e.student_name === st.full_name) && e.session_date === sessionDate
       );
-      const hasAttOnDate = attendance.some(
-        (a) =>
-          (a.student_id === st.id || (st.student_code && a.student_code === st.student_code) || a.student_name === st.full_name) &&
-          (sessions.find((s) => s.id === a.session_id)?.session_date === sessionDate || a.marked_at?.startsWith(sessionDate))
-      );
+
+      // 3. Hoặc học viên thực sự CÓ MẶT hoặc ĐÃ ĐIỂM DANH (loại trừ unmarked) trong buổi học ngày này (không lọc theo thời điểm bấm lưu marked_at)
+      const hasAttOnDate = attendance.some((a) => {
+        if (!a.status || a.status === 'unmarked') return false;
+        const matchesStudent =
+          a.student_id === st.id ||
+          (st.student_code && a.student_code === st.student_code) ||
+          a.student_name === st.full_name;
+        if (!matchesStudent) return false;
+        const sess = sessions.find((s) => s.id === a.session_id);
+        return sess?.session_date === sessionDate;
+      });
 
       return inActiveClass || hasEvalOnDate || hasAttOnDate;
     });
@@ -291,7 +312,7 @@ export default function StudentEvaluationManager() {
           (a.student_id === activeStudent.id ||
             (activeStudent.student_code && a.student_code === activeStudent.student_code) ||
             a.student_name === activeStudent.full_name) &&
-          (sessions.find((s) => s.id === a.session_id)?.session_date === sessionDate || a.marked_at?.startsWith(sessionDate)) &&
+          sessions.find((s) => s.id === a.session_id)?.session_date === sessionDate &&
           a.status === 'present'
       )
     : false;
@@ -406,7 +427,7 @@ export default function StudentEvaluationManager() {
                     const isAttended = attendance.some(
                       (a) =>
                         (a.student_id === st.id || (st.student_code && a.student_code === st.student_code) || a.student_name === st.full_name) &&
-                        (sessions.find((s) => s.id === a.session_id)?.session_date === sessionDate || a.marked_at?.startsWith(sessionDate)) &&
+                        sessions.find((s) => s.id === a.session_id)?.session_date === sessionDate &&
                         a.status === 'present'
                     );
 
@@ -476,7 +497,20 @@ export default function StudentEvaluationManager() {
 
         {/* Panel Phải — Đánh giá chi tiết chuẩn như máy tính */}
         <div className="col-span-8 bg-white rounded-2xl border border-gray-200 p-6 shadow-sm space-y-6">
-          {/* Header học viên & 3 Tabs */}
+          {!activeStudent ? (
+            <div className="py-24 text-center space-y-3">
+              <Calendar className="w-12 h-12 text-gray-300 mx-auto" />
+              <h3 className="text-base font-extrabold text-gray-800">
+                Không có lịch học vào ngày {formatDate(sessionDate)}
+              </h3>
+              <p className="text-xs text-gray-400 max-w-md mx-auto leading-relaxed">
+                Hệ thống chỉ hiển thị học viên của các lớp có lịch học trong ngày {dayName} ({formatDate(sessionDate)}).
+                Các lớp như K116 và P68 không có lịch học hôm nay nên không hiển thị.
+              </p>
+            </div>
+          ) : (
+            <>
+              {/* Header học viên & 3 Tabs */}
           <div className="pb-4 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
               <div className="flex flex-wrap items-center gap-2">
@@ -694,6 +728,8 @@ export default function StudentEvaluationManager() {
                 ))
               )}
             </div>
+          )}
+            </>
           )}
         </div>
       </div>

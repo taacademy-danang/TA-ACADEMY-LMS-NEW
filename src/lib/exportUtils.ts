@@ -50,8 +50,8 @@ export function exportAttendanceAndBenefitsToExcel({
   students.forEach((st, idx) => {
     const studentClass = classes.find((c) => c.id === st.class_id || c.code === st.class_code);
     const studentSessions = sessions
-      .filter((sess) => sess.class_id === st.class_id || (studentClass && sess.class_id === studentClass.id))
-      .sort((a, b) => a.session_number - b.session_number);
+      .filter((sess) => (sess.class_id === st.class_id || sess.class_id === studentClass?.id) && sess.status !== 'cancelled')
+      .sort((a, b) => new Date(a.session_date).getTime() - new Date(b.session_date).getTime());
 
     const studentAtt = attendance.filter((a) => a.student_id === st.id);
 
@@ -60,7 +60,8 @@ export function exportAttendanceAndBenefitsToExcel({
 
     const sessionValues: string[] = [];
     for (let b = 1; b <= maxSessions; b++) {
-      const sess = studentSessions.find((s) => s.session_number === b);
+      // Khớp theo session_number hoặc theo thứ tự buổi học tăng dần theo ngày
+      const sess = studentSessions.find((s) => s.session_number === b) || studentSessions[b - 1];
       if (!sess) {
         sessionValues.push('—');
         continue;
@@ -77,7 +78,8 @@ export function exportAttendanceAndBenefitsToExcel({
         absentCount++;
         sessionValues.push(`Vắng (${dateStr})`);
       } else {
-        sessionValues.push(dateStr);
+        // Học viên không điểm danh / chưa học: không ghi vào sheet
+        sessionValues.push('—');
       }
     }
 

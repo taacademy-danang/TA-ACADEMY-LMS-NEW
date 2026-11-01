@@ -352,8 +352,8 @@ function dongBoDiemDanhQuyenLoi() {
   students.forEach(function(st, idx) {
     const studentClass = classes.find(function(c) { return c.id === st.class_id || c.code === st.class_code; });
     const studentSessions = sessions
-      .filter(function(sess) { return sess.class_id === st.class_id || (studentClass && sess.class_id === studentClass.id); })
-      .sort(function(a, b) { return a.session_number - b.session_number; });
+      .filter(function(sess) { return (sess.class_id === st.class_id || (studentClass && sess.class_id === studentClass.id)) && sess.status !== "cancelled"; })
+      .sort(function(a, b) { return new Date(a.session_date) - new Date(b.session_date); });
 
     const studentAtt = attendance.filter(function(a) { return a.student_id === st.id; });
 
@@ -374,7 +374,8 @@ function dongBoDiemDanhQuyenLoi() {
 
     // Duyệt qua từng buổi từ Buổi 1 đến Buổi N
     for (let b = 1; b <= maxSessions; b++) {
-      const sess = studentSessions.find(function(s) { return s.session_number === b; });
+      // Khớp theo session_number hoặc theo thứ tự buổi học tăng dần theo ngày
+      const sess = studentSessions.find(function(s) { return s.session_number === b; }) || studentSessions[b - 1];
       if (!sess) {
         row.push("—");
         rowBg.push("#FFFFFF");
@@ -406,9 +407,10 @@ function dongBoDiemDanhQuyenLoi() {
         rowFont.push("#B06000");
         rowWeight.push("bold");
       } else {
-        row.push(dateStr);
-        rowBg.push("#F8F9FA");
-        rowFont.push("#4A5568");
+        // Học viên không điểm danh / chưa học: không ghi ngày vào sheet, để trống (—)
+        row.push("—");
+        rowBg.push("#FFFFFF");
+        rowFont.push("#A0AEC0");
         rowWeight.push("normal");
       }
     }

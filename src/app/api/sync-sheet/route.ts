@@ -67,8 +67,8 @@ export async function GET() {
     const rows = studentList.map((st, idx) => {
       const studentClass = classList.find((c) => c.id === st.class_id || c.code === st.class_code);
       const studentSessions = sessionList
-        .filter((sess) => sess.class_id === st.class_id || sess.class_id === studentClass?.id)
-        .sort((a, b) => a.session_number - b.session_number);
+        .filter((sess) => (sess.class_id === st.class_id || sess.class_id === studentClass?.id) && sess.status !== 'cancelled')
+        .sort((a, b) => new Date(a.session_date).getTime() - new Date(b.session_date).getTime());
 
       const studentAtt = attendanceList.filter((a) => a.student_id === st.id);
 
@@ -78,12 +78,13 @@ export async function GET() {
 
       const sessionCells = sessionHeaders.map((_, sIdx) => {
         const sessionNum = sIdx + 1;
-        const matchedSess = studentSessions.find((sess) => sess.session_number === sessionNum);
+        // Khớp theo session_number hoặc theo thứ tự buổi học tăng dần theo ngày
+        const matchedSess = studentSessions.find((sess) => sess.session_number === sessionNum) || studentSessions[sIdx];
         if (!matchedSess) {
           return { value: '—', bg: '#FFFFFF', color: '#888888' };
         }
 
-        // Định dạng ngày theo định dạng d/M (ví dụ: 23/9)
+        // Định dạng ngày theo định dạng d/M (ví dụ: 22/10)
         const dateObj = new Date(matchedSess.session_date);
         const dayMonthStr = !isNaN(dateObj.getTime())
           ? `${dateObj.getDate()}/${dateObj.getMonth() + 1}`
@@ -98,7 +99,8 @@ export async function GET() {
           return { value: `Vắng (${dayMonthStr})`, bg: '#FCE8E6', color: '#C5221F', status: 'absent' };
         }
 
-        return { value: dayMonthStr, bg: '#F8F9FA', color: '#333333', status: 'scheduled' };
+        // Nếu học viên KHÔNG ĐIỂM DANH (unmarked) hoặc chưa học: Không ghi ngày vào sheet, để trống (—)
+        return { value: '—', bg: '#FFFFFF', color: '#A0AEC0', status: 'unmarked' };
       });
 
       // Kiểm tra quyền lợi

@@ -284,13 +284,28 @@ export async function dbSaveAttendance(records: AttendanceRecord[], sessionData?
         }
       }
 
+      let sessionNumber = sessionData?.session_number;
+      if (!sessionNumber || sessionNumber === 1) {
+        if (classId) {
+          const { count } = await supabase
+            .from('class_sessions')
+            .select('id', { count: 'exact', head: true })
+            .eq('class_id', classId)
+            .lt('session_date', sessionDate)
+            .neq('status', 'cancelled');
+          sessionNumber = (count || 0) + 1;
+        } else {
+          sessionNumber = 1;
+        }
+      }
+
       await supabase.from('class_sessions').upsert({
         id: sessionId,
         class_id: classId,
         class_name: clsName,
         class_code: clsCode,
         course_name: crsName,
-        session_number: sessionData?.session_number || 1,
+        session_number: sessionNumber,
         session_date: sessionDate,
         day_of_week: dayOfWeek,
         start_time: startTime,
@@ -303,7 +318,19 @@ export async function dbSaveAttendance(records: AttendanceRecord[], sessionData?
       await supabase.from('class_sessions').update({ status: 'completed' }).eq('id', sessionId);
     }
   }
-  await supabase.from('attendance_records').upsert(records, { onConflict: 'id' });
+
+  // Tách riêng danh sách: Chỉ lưu những học viên thực sự được điểm danh (present, late, absent)
+  // Những học viên chọn "Không điểm danh" (unmarked) sẽ bị xóa khỏi cơ sở dữ liệu để không lưu rác/không ghi vào sheet
+  const markedRecords = records.filter((r) => r.status && r.status !== 'unmarked');
+  const unmarkedStudentIds = records.filter((r) => !r.status || r.status === 'unmarked').map((r) => r.student_id);
+
+  if (unmarkedStudentIds.length > 0 && sessionId) {
+    await supabase.from('attendance_records').delete().eq('session_id', sessionId).in('student_id', unmarkedStudentIds);
+  }
+
+  if (markedRecords.length > 0) {
+    await supabase.from('attendance_records').upsert(markedRecords, { onConflict: 'id' });
+  }
 }
 
 // ==========================================
