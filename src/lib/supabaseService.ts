@@ -232,7 +232,7 @@ export async function dbDeleteStudentCompletely(studentId: string, studentCode?:
 // ==========================================
 export async function dbAddSession(session: ClassSession) {
   if (!isSupabaseConfigured || !supabase) return;
-  await supabase.from('class_sessions').insert(session);
+  await supabase.from('class_sessions').upsert(session);
 }
 
 export async function dbBatchAddSessions(sessions: ClassSession[]) {

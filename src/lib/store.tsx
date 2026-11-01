@@ -107,6 +107,7 @@ interface AppContextType {
   addSession: (sessionData: Omit<ClassSession, 'id' | 'status'>) => void;
   editSession: (id: string, updatedData: Partial<ClassSession>) => void;
   deleteSession: (sessionId: string) => void;
+  cancelSessionOnDate: (session: ClassSession) => void;
 
   // Attendance workflow
   saveAttendance: (
@@ -605,9 +606,60 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const deleteSession = (sessionId: string) => {
+    // 1. Nếu là lịch tự động sinh từ lớp (cls-sess-{classId}-{dayIndex})
+    if (sessionId.startsWith('cls-sess-')) {
+      const rest = sessionId.replace('cls-sess-', '');
+      const lastDashIdx = rest.lastIndexOf('-');
+      const classId = rest.substring(0, lastDashIdx);
+      const dayIndex = parseInt(rest.substring(lastDashIdx + 1), 10);
+
+      const cls = classes.find((c) => c.id === classId);
+      if (cls) {
+        const updatedDays = (cls.days_of_week || []).filter((d) => d !== dayIndex);
+        setClasses((prev) => prev.map((c) => (c.id === classId ? { ...c, days_of_week: updatedDays } : c)));
+        dbUpdateClass(classId, { days_of_week: updatedDays });
+      }
+      setSessions((prev) => prev.filter((s) => !(s.class_id === classId && s.day_of_week === dayIndex)));
+      showToast('Đã xóa vĩnh viễn lịch dạy này khỏi lớp học!', 'info');
+      return;
+    }
+
+    // 2. Nếu là session bình thường
+    const targetSession = sessions.find((s) => s.id === sessionId);
+    if (targetSession?.class_id && targetSession.day_of_week) {
+      const cls = classes.find((c) => c.id === targetSession.class_id);
+      if (cls && cls.days_of_week?.includes(targetSession.day_of_week)) {
+        const updatedDays = cls.days_of_week.filter((d) => d !== targetSession.day_of_week);
+        setClasses((prev) => prev.map((c) => (c.id === cls.id ? { ...c, days_of_week: updatedDays } : c)));
+        dbUpdateClass(cls.id, { days_of_week: updatedDays });
+      }
+    }
+
     setSessions((prev) => prev.filter((s) => s.id !== sessionId));
     dbDeleteSession(sessionId);
-    showToast('Đã xóa buổi học khỏi thời khóa biểu (lớp nghỉ)', 'info');
+    showToast('Đã xóa buổi học khỏi thời khóa biểu', 'info');
+  };
+
+  const cancelSessionOnDate = (session: ClassSession) => {
+    const cancelId = session.id.startsWith('cls-sess-')
+      ? `sess-cancel-${session.class_id}-${session.session_date}`
+      : session.id;
+
+    const cancelledSession: ClassSession = {
+      ...session,
+      id: cancelId,
+      status: 'cancelled',
+    };
+
+    setSessions((prev) => {
+      const filtered = prev.filter(
+        (s) => s.id !== cancelId && !(s.class_id === session.class_id && s.session_date === session.session_date)
+      );
+      return [...filtered, cancelledSession];
+    });
+
+    dbAddSession(cancelledSession);
+    showToast(`Đã cho nghỉ buổi học ngày ${session.session_date ? session.session_date : ''} (lớp nghỉ)`, 'info');
   };
 
   const saveAttendance = (
@@ -1219,6 +1271,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         addSession,
         editSession,
         deleteSession,
+        cancelSessionOnDate,
         saveAttendance,
         saveEvaluation,
         submitHomework,

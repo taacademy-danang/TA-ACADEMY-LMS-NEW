@@ -18,10 +18,10 @@ import {
 } from 'lucide-react';
 import { useApp } from '@/lib/store';
 import { ClassSession, SessionType } from '@/types';
-import { calculateClassEndTime } from '@/lib/utils';
+import { calculateClassEndTime, formatDate } from '@/lib/utils';
 
 export default function ScheduleManager() {
-  const { sessions, classes, profiles, students, addSession, editSession, deleteSession, currentUser, showToast } =
+  const { sessions, classes, profiles, students, addSession, editSession, deleteSession, cancelSessionOnDate, currentUser, showToast } =
     useApp();
 
   const [viewMode, setViewMode] = useState<'week' | 'day' | 'list'>('week');
@@ -43,6 +43,23 @@ export default function ScheduleManager() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedSessionToEdit, setSelectedSessionToEdit] = useState<ClassSession | null>(null);
+
+  // Modal Xóa / Hủy lịch dạy
+  const [deleteTarget, setDeleteTarget] = useState<{
+    isOpen: boolean;
+    session: ClassSession | null;
+    mode: 'date_only' | 'recurring';
+  }>({
+    isOpen: false,
+    session: null,
+    mode: 'date_only',
+  });
+
+  // Chọn thứ trong chế độ xem Ngày
+  const [selectedDayIndex, setSelectedDayIndex] = useState<number>(() => {
+    const d = new Date().getDay();
+    return d === 0 ? 7 : d;
+  });
 
   // Form Thêm lịch dạy (Group vs Private)
   const [sessionType, setSessionType] = useState<SessionType>('group');
@@ -132,6 +149,80 @@ export default function ScheduleManager() {
     }
     return true;
   });
+
+  // Tổng hợp tất cả các buổi học thực tế của 7 ngày trong tuần hiện tại
+  const weekSessionsByDay = useMemo(() => {
+    const map = new Map<number, ClassSession[]>();
+
+    daysOfWeekHeader.forEach((d) => {
+      // 1. Các buổi từ sessions (loại trừ các buổi bị hủy)
+      const matched = filteredSessions.filter((s) => {
+        if (s.status === 'cancelled') return false;
+        if (s.session_date) {
+          return s.session_date === d.fullDate;
+        }
+        return s.day_of_week === d.dayIndex;
+      });
+
+      // 2. Lịch định kỳ từ classes nếu chưa bị hủy vào ngày này
+      const fallbacks = classes
+        .filter((c) => {
+          if (!c.days_of_week?.includes(d.dayIndex)) return false;
+          if (c.start_date && c.start_date > d.fullDate) return false;
+          if (selectedClass !== 'all' && c.id !== selectedClass && c.code !== selectedClass) return false;
+          if (selectedTeacher !== 'all' && c.teacher_id !== selectedTeacher && c.teacher_name !== selectedTeacher) return false;
+
+          const isCancelled = sessions.some(
+            (s) =>
+              (s.class_id === c.id || s.class_code === c.code) &&
+              s.session_date === d.fullDate &&
+              s.status === 'cancelled'
+          );
+          return !isCancelled;
+        })
+        .map((c) => ({
+          id: `cls-sess-${c.id}-${d.dayIndex}`,
+          class_id: c.id,
+          class_code: c.code,
+          class_name: c.name,
+          course_name: c.course_name,
+          session_type: c.class_type === 'one_on_one' ? ('private' as const) : ('group' as const),
+          session_number: 1,
+          session_date: d.fullDate,
+          day_of_week: d.dayIndex,
+          start_time: c.start_time,
+          end_time: c.end_time,
+          teacher_id: c.teacher_id,
+          teacher_name: c.teacher_name,
+          room: c.room || 'Phòng Studio A1',
+          status: 'scheduled' as const,
+        }));
+
+      // Fallbacks đi trước, matched đi sau để matched ghi đè
+      const uniqueMap = new Map<string, ClassSession>();
+      [...fallbacks, ...matched].forEach((item) => {
+        const key = `${item.class_id || item.class_code || item.class_name}-${item.start_time}`;
+        uniqueMap.set(key, item);
+      });
+
+      map.set(d.dayIndex, Array.from(uniqueMap.values()));
+    });
+
+    return map;
+  }, [daysOfWeekHeader, filteredSessions, classes, sessions, selectedClass, selectedTeacher]);
+
+  // Toàn bộ danh sách buổi học trong tuần cho chế độ xem Danh sách (List mode)
+  const allListSessions = useMemo(() => {
+    const list: ClassSession[] = [];
+    weekSessionsByDay.forEach((dayList) => {
+      list.push(...dayList);
+    });
+    return list.sort(
+      (a, b) =>
+        (a.session_date || '').localeCompare(b.session_date || '') ||
+        a.start_time.localeCompare(b.start_time)
+    );
+  }, [weekSessionsByDay]);
 
   const handleOpenAdd = () => {
     // Nếu giáo viên đang đăng nhập -> cố định giáo viên phụ trách
@@ -230,6 +321,29 @@ export default function ScheduleManager() {
     setShowEditModal(false);
   };
 
+  const handleOpenDelete = (session: ClassSession) => {
+    setDeleteTarget({
+      isOpen: true,
+      session,
+      mode: 'date_only',
+    });
+  };
+
+  const handleConfirmDelete = () => {
+    if (!deleteTarget.session) return;
+    const s = deleteTarget.session;
+
+    if (s.class_id && deleteTarget.mode === 'recurring') {
+      // Xóa vĩnh viễn lịch thứ này của lớp
+      deleteSession(s.id);
+    } else {
+      // Nghỉ buổi học ngày này (Lớp nghỉ)
+      cancelSessionOnDate(s);
+    }
+
+    setDeleteTarget({ isOpen: false, session: null, mode: 'date_only' });
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -259,7 +373,9 @@ export default function ScheduleManager() {
               <ChevronLeft className="w-4 h-4" />
             </button>
             <div className="flex items-center space-x-2 px-2.5 py-1 text-xs font-bold text-gray-800">
-              <span>Tuần 26/10 – 01/11/2026</span>
+              <span>
+                Tuần {daysOfWeekHeader[0]?.date} – {daysOfWeekHeader[6]?.date}/{daysOfWeekHeader[6]?.fullDate.split('-')[0]}
+              </span>
               <CalendarIcon className="w-3.5 h-3.5 text-gray-400" />
             </div>
             <button
@@ -372,50 +488,10 @@ export default function ScheduleManager() {
                         {time}
                       </td>
                       {daysOfWeekHeader.map((d) => {
-                        const matchedSessions = filteredSessions.filter((s) => {
+                        const sessionsInHour = (weekSessionsByDay.get(d.dayIndex) || []).filter((s) => {
                           const sHour = parseInt(s.start_time.split(':')[0], 10);
-                          if (s.session_date) {
-                            return s.session_date === d.fullDate && sHour === hour;
-                          }
-                          return s.day_of_week === d.dayIndex && sHour === hour;
+                          return sHour === hour;
                         });
-
-                        // Bổ sung lịch học tự động từ các lớp đã tạo (classes) nếu lớp đó học vào thứ này
-                        const classFallbackSessions = classes
-                          .filter((c) => {
-                            const cHour = parseInt(c.start_time.split(':')[0], 10);
-                            const matchesClass = selectedClass === 'all' || c.id === selectedClass || c.code === selectedClass;
-                            const matchesTeacher = selectedTeacher === 'all' || c.teacher_id === selectedTeacher || c.teacher_name === selectedTeacher;
-                            const matchesDay = c.days_of_week?.includes(d.dayIndex);
-                            return matchesClass && matchesTeacher && matchesDay && cHour === hour;
-                          })
-                          .map((c) => ({
-                            id: `cls-sess-${c.id}-${d.dayIndex}`,
-                            class_id: c.id,
-                            class_code: c.code,
-                            class_name: c.name,
-                            course_name: c.course_name,
-                            session_type: c.class_type === 'one_on_one' ? ('private' as const) : ('group' as const),
-                            session_number: 1,
-                            session_date: d.fullDate,
-                            day_of_week: d.dayIndex,
-                            start_time: c.start_time,
-                            end_time: c.end_time,
-                            teacher_id: c.teacher_id,
-                            teacher_name: c.teacher_name,
-                            room: c.room,
-                            status: 'scheduled' as const,
-                          }));
-
-                        // Gộp và lọc duy nhất, mỗi lớp chỉ xuất hiện đúng 1 ô trên 1 khung giờ
-                        const uniqueSessions = Array.from(
-                          new Map(
-                            [...matchedSessions, ...classFallbackSessions].map((item) => [
-                              `${item.class_id || item.class_code || item.class_name}-${item.start_time}`,
-                              item,
-                            ])
-                          ).values()
-                        );
 
                         return (
                           <td
@@ -425,7 +501,7 @@ export default function ScheduleManager() {
                             }`}
                           >
                             <div className="space-y-2">
-                              {uniqueSessions.map((session) => (
+                              {sessionsInHour.map((session) => (
                                 <div
                                   key={session.id}
                                   className={`p-3 rounded-xl border hover:shadow-md transition-all group relative ${
@@ -445,19 +521,19 @@ export default function ScheduleManager() {
                                       {session.session_type === 'private' ? 'KÈM 1-1' : session.class_code}
                                     </span>
 
-                                    {/* Action buttons: Sửa (giờ/GV dạy thay) & Xóa khi lớp nghỉ */}
+                                    {/* Action buttons: Sửa & Xóa lịch dạy */}
                                     <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                       <button
                                         onClick={() => handleOpenEdit(session)}
-                                        className="text-gray-500 hover:text-blue-600 p-0.5"
+                                        className="text-gray-500 hover:text-blue-600 p-0.5 cursor-pointer"
                                         title="Chỉnh sửa giờ hoặc đổi giáo viên"
                                       >
                                         <Edit2 className="w-3.5 h-3.5" />
                                       </button>
                                       <button
-                                        onClick={() => deleteSession(session.id)}
-                                        className="text-gray-400 hover:text-red-500 p-0.5"
-                                        title="Xóa khi lớp nghỉ"
+                                        onClick={() => handleOpenDelete(session)}
+                                        className="text-gray-400 hover:text-red-500 p-0.5 cursor-pointer"
+                                        title="Xóa lịch dạy / Lớp nghỉ"
                                       >
                                         <Trash2 className="w-3.5 h-3.5" />
                                       </button>
@@ -493,6 +569,130 @@ export default function ScheduleManager() {
         </div>
       )}
 
+      {/* Day Mode */}
+      {viewMode === 'day' && (
+        <div className="space-y-4">
+          {/* Day Selector Buttons */}
+          <div className="flex flex-wrap gap-2">
+            {daysOfWeekHeader.map((d) => {
+              const isSelected = d.dayIndex === selectedDayIndex;
+              const daySessionsCount = (weekSessionsByDay.get(d.dayIndex) || []).length;
+              return (
+                <button
+                  key={d.dayIndex}
+                  onClick={() => setSelectedDayIndex(d.dayIndex)}
+                  className={`px-4 py-2.5 rounded-xl font-bold text-xs transition-all flex items-center space-x-2 cursor-pointer ${
+                    isSelected
+                      ? 'bg-brand-500 text-white shadow-md shadow-red-200 scale-[1.02]'
+                      : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50'
+                  }`}
+                >
+                  <span>
+                    {d.name} ({d.date})
+                  </span>
+                  {daySessionsCount > 0 && (
+                    <span
+                      className={`px-1.5 py-0.5 rounded-full text-[10px] font-extrabold ${
+                        isSelected ? 'bg-white/20 text-white' : 'bg-red-50 text-brand-500'
+                      }`}
+                    >
+                      {daySessionsCount}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Schedule for selected day */}
+          <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm">
+            <div className="p-4 border-b border-gray-100 flex items-center justify-between">
+              <div>
+                <h3 className="font-extrabold text-sm text-gray-900">
+                  Lịch dạy {daysOfWeekHeader.find((d) => d.dayIndex === selectedDayIndex)?.name} – Ngày {daysOfWeekHeader.find((d) => d.dayIndex === selectedDayIndex)?.date}
+                </h3>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  {(weekSessionsByDay.get(selectedDayIndex) || []).length} buổi học đã được sắp xếp
+                </p>
+              </div>
+            </div>
+
+            {(weekSessionsByDay.get(selectedDayIndex) || []).length === 0 ? (
+              <div className="p-12 text-center text-xs text-gray-400 space-y-2">
+                <CalendarIcon className="w-8 h-8 text-gray-300 mx-auto" />
+                <p className="font-bold text-gray-700">Không có lịch học nào trong ngày này</p>
+                <p className="text-[11px] text-gray-400">Các giáo viên và học viên được nghỉ theo lịch</p>
+              </div>
+            ) : (
+              <div className="p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {(weekSessionsByDay.get(selectedDayIndex) || []).map((session) => (
+                  <div
+                    key={session.id}
+                    className={`p-4 rounded-2xl border hover:shadow-md transition-all relative ${
+                      session.session_type === 'private'
+                        ? 'bg-amber-50/70 border-amber-200'
+                        : 'bg-red-50/50 border-red-100'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <span
+                        className={`text-[11px] font-extrabold px-2 py-0.5 rounded-md ${
+                          session.session_type === 'private'
+                            ? 'bg-amber-200 text-amber-900'
+                            : 'bg-red-100 text-brand-500'
+                        }`}
+                      >
+                        {session.session_type === 'private' ? 'KÈM 1-1' : session.class_code}
+                      </span>
+
+                      <div className="flex items-center space-x-1">
+                        <button
+                          onClick={() => handleOpenEdit(session)}
+                          className="p-1 text-gray-500 hover:text-blue-600 hover:bg-white rounded-lg transition-colors cursor-pointer"
+                          title="Chỉnh sửa giờ hoặc đổi giáo viên"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleOpenDelete(session)}
+                          className="p-1 text-gray-400 hover:text-red-500 hover:bg-white rounded-lg transition-colors cursor-pointer"
+                          title="Xóa lịch dạy / Lớp nghỉ"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+
+                    <h4 className="font-extrabold text-sm text-gray-900 mb-2">
+                      {session.class_name}
+                    </h4>
+
+                    <div className="space-y-1 text-xs">
+                      <div className="flex items-center space-x-1.5 font-bold text-brand-500">
+                        <User className="w-3.5 h-3.5" />
+                        <span>GV: {session.teacher_name}</span>
+                      </div>
+                      <div className="flex items-center space-x-1.5 text-gray-600">
+                        <Clock className="w-3.5 h-3.5 text-gray-400" />
+                        <span>
+                          {session.start_time} - {session.end_time}
+                        </span>
+                      </div>
+                      {session.room && (
+                        <div className="flex items-center space-x-1.5 text-gray-500 text-[11px]">
+                          <MapPin className="w-3.5 h-3.5 text-gray-400" />
+                          <span>{session.room}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* List Mode */}
       {viewMode === 'list' && (
         <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm">
@@ -509,46 +709,54 @@ export default function ScheduleManager() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 font-medium">
-              {filteredSessions.map((s) => (
-                <tr key={s.id} className="hover:bg-gray-50/60">
-                  <td className="py-3.5 px-4 font-bold text-gray-900">{s.session_date}</td>
-                  <td className="py-3.5 px-4 text-brand-500 font-bold">
-                    {s.start_time} - {s.end_time}
-                  </td>
-                  <td className="py-3.5 px-4">
-                    <span
-                      className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                        s.session_type === 'private'
-                          ? 'bg-amber-100 text-amber-800'
-                          : 'bg-blue-100 text-blue-800'
-                      }`}
-                    >
-                      {s.session_type === 'private' ? 'Kèm 1-1' : 'Lớp nhóm'}
-                    </span>
-                  </td>
-                  <td className="py-3.5 px-4 font-bold text-gray-800">{s.class_name}</td>
-                  <td className="py-3.5 px-4 font-semibold text-gray-900">{s.teacher_name}</td>
-                  <td className="py-3.5 px-4 text-gray-500">{s.room}</td>
-                  <td className="py-3.5 px-4 text-right">
-                    <div className="inline-flex items-center space-x-1">
-                      <button
-                        onClick={() => handleOpenEdit(s)}
-                        className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                        title="Sửa lịch học hoặc đổi giáo viên"
-                      >
-                        <Edit2 className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => deleteSession(s.id)}
-                        className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                        title="Xóa khi lớp nghỉ"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
+              {allListSessions.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="py-8 text-center text-gray-400">
+                    Không có lịch dạy nào trong tuần này.
                   </td>
                 </tr>
-              ))}
+              ) : (
+                allListSessions.map((s) => (
+                  <tr key={s.id} className="hover:bg-gray-50/60">
+                    <td className="py-3.5 px-4 font-bold text-gray-900">{s.session_date ? formatDate(s.session_date) : '-'}</td>
+                    <td className="py-3.5 px-4 text-brand-500 font-bold">
+                      {s.start_time} - {s.end_time}
+                    </td>
+                    <td className="py-3.5 px-4">
+                      <span
+                        className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                          s.session_type === 'private'
+                            ? 'bg-amber-100 text-amber-800'
+                            : 'bg-blue-100 text-blue-800'
+                        }`}
+                      >
+                        {s.session_type === 'private' ? 'Kèm 1-1' : 'Lớp nhóm'}
+                      </span>
+                    </td>
+                    <td className="py-3.5 px-4 font-bold text-gray-800">{s.class_name}</td>
+                    <td className="py-3.5 px-4 font-semibold text-gray-900">{s.teacher_name}</td>
+                    <td className="py-3.5 px-4 text-gray-500">{s.room}</td>
+                    <td className="py-3.5 px-4 text-right">
+                      <div className="inline-flex items-center space-x-1">
+                        <button
+                          onClick={() => handleOpenEdit(s)}
+                          className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
+                          title="Sửa lịch học hoặc đổi giáo viên"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleOpenDelete(s)}
+                          className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                          title="Xóa lịch dạy / Lớp nghỉ"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
@@ -808,6 +1016,115 @@ export default function ScheduleManager() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Xóa / Hủy lịch dạy */}
+      {deleteTarget.isOpen && deleteTarget.session && (
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-gray-100 animate-scale-up">
+            <div className="flex items-center space-x-3 text-red-600 mb-4">
+              <div className="w-10 h-10 rounded-xl bg-red-100 flex items-center justify-center shrink-0">
+                <Trash2 className="w-5 h-5 text-red-600" />
+              </div>
+              <div>
+                <h3 className="font-extrabold text-gray-900 text-base">Xóa lịch dạy / Buổi học</h3>
+                <p className="text-xs text-gray-500">Chọn phương thức xóa phù hợp</p>
+              </div>
+            </div>
+
+            <div className="p-3.5 bg-gray-50 rounded-xl border border-gray-200 mb-4 text-xs space-y-1.5">
+              <div className="font-bold text-gray-900 text-sm">
+                {deleteTarget.session.class_name} {deleteTarget.session.class_code ? `(${deleteTarget.session.class_code})` : ''}
+              </div>
+              <div className="text-gray-600">
+                Buổi học: <strong className="text-brand-500">{deleteTarget.session.session_date ? formatDate(deleteTarget.session.session_date) : ''}</strong>{' '}
+                ({deleteTarget.session.day_of_week === 7 ? 'Chủ nhật' : `Thứ ${deleteTarget.session.day_of_week + 1}`})
+              </div>
+              <div className="text-gray-600">
+                Khung giờ: <strong>{deleteTarget.session.start_time} - {deleteTarget.session.end_time}</strong> &bull; GV:{' '}
+                <strong>{deleteTarget.session.teacher_name}</strong>
+              </div>
+            </div>
+
+            {/* Options nếu là lịch học của lớp */}
+            {deleteTarget.session.class_id ? (
+              <div className="space-y-3 mb-5">
+                <label
+                  onClick={() => setDeleteTarget((p) => ({ ...p, mode: 'date_only' }))}
+                  className={`p-3 rounded-xl border flex items-start space-x-3 cursor-pointer transition-all ${
+                    deleteTarget.mode === 'date_only'
+                      ? 'border-brand-500 bg-red-50/40 ring-1 ring-brand-500'
+                      : 'border-gray-200 hover:bg-gray-50'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="deleteMode"
+                    checked={deleteTarget.mode === 'date_only'}
+                    onChange={() => setDeleteTarget((p) => ({ ...p, mode: 'date_only' }))}
+                    className="mt-0.5 text-brand-500 focus:ring-brand-500 cursor-pointer"
+                  />
+                  <div>
+                    <div className="text-xs font-bold text-gray-900">
+                      1. Nghỉ buổi học ngày này (Lớp nghỉ)
+                    </div>
+                    <div className="text-[11px] text-gray-500 mt-0.5 leading-relaxed">
+                      Chỉ hủy buổi học ngày {deleteTarget.session.session_date ? formatDate(deleteTarget.session.session_date) : ''}. Các tuần khác lớp vẫn học bình thường.
+                    </div>
+                  </div>
+                </label>
+
+                <label
+                  onClick={() => setDeleteTarget((p) => ({ ...p, mode: 'recurring' }))}
+                  className={`p-3 rounded-xl border flex items-start space-x-3 cursor-pointer transition-all ${
+                    deleteTarget.mode === 'recurring'
+                      ? 'border-brand-500 bg-red-50/40 ring-1 ring-brand-500'
+                      : 'border-gray-200 hover:bg-gray-50'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="deleteMode"
+                    checked={deleteTarget.mode === 'recurring'}
+                    onChange={() => setDeleteTarget((p) => ({ ...p, mode: 'recurring' }))}
+                    className="mt-0.5 text-brand-500 focus:ring-brand-500 cursor-pointer"
+                  />
+                  <div>
+                    <div className="text-xs font-bold text-red-600">
+                      2. Xóa vĩnh viễn lịch {deleteTarget.session.day_of_week === 7 ? 'Chủ nhật' : `Thứ ${deleteTarget.session.day_of_week + 1}`} của lớp này
+                    </div>
+                    <div className="text-[11px] text-gray-500 mt-0.5 leading-relaxed">
+                      Xóa hẳn khung giờ này khỏi thời khóa biểu của lớp cho tất cả các tuần.
+                    </div>
+                  </div>
+                </label>
+              </div>
+            ) : (
+              <div className="mb-5 text-xs text-gray-600 p-3 bg-red-50/50 rounded-xl border border-red-100">
+                Bạn có chắc chắn muốn xóa lịch dạy kèm 1-1 này khỏi thời khóa biểu?
+              </div>
+            )}
+
+            <div className="flex items-center justify-end space-x-2">
+              <button
+                type="button"
+                onClick={() => setDeleteTarget({ isOpen: false, session: null, mode: 'date_only' })}
+                className="px-4 py-2 text-xs font-bold text-gray-600 hover:bg-gray-100 rounded-xl transition-colors cursor-pointer"
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDelete}
+                className="px-5 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl shadow-md shadow-red-200 transition-all hover:scale-102 cursor-pointer"
+              >
+                {deleteTarget.session.class_id && deleteTarget.mode === 'recurring'
+                  ? 'Xác nhận xóa vĩnh viễn'
+                  : 'Xác nhận cho nghỉ'}
+              </button>
+            </div>
           </div>
         </div>
       )}

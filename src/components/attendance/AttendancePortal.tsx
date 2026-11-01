@@ -46,6 +46,7 @@ export default function AttendancePortal() {
   const dateSessions = useMemo(() => {
     // 1. Tìm các buổi học có ngày trùng khớp chính xác trong sessions
     const directMatched = sessions.filter((s) => {
+      if (s.status === 'cancelled') return false;
       const matchesDate = s.session_date === selectedDate;
       if (!matchesDate) return false;
       if (isTeacher) {
@@ -61,6 +62,14 @@ export default function AttendancePortal() {
     // 2. Dự phòng: Nếu sessions chưa kịp nạp nhưng lớp học trong classes có lịch học vào thứ này
     const classFallbacks = classes
       .filter((c) => {
+        const isCancelled = sessions.some(
+          (s) =>
+            (s.class_id === c.id || s.class_code === c.code) &&
+            s.session_date === selectedDate &&
+            s.status === 'cancelled'
+        );
+        if (isCancelled) return false;
+
         if (!c.days_of_week?.includes(selectedDayOfWeek)) return false;
         if (c.start_date && c.start_date > selectedDate) return false;
         if (isTeacher) {
